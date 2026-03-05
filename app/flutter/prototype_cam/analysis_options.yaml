@@ -1,0 +1,18 @@
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  errors:
+    # camera_service.dart는 VideoElement/MediaStream/CanvasElement 등
+    # Web API를 직접 사용해야 하므로 dart:html 의존이 불가피.
+    # package:web 마이그레이션 시 이 억제 규칙 제거할 것.
+    deprecated_member_use: ignore
+
+linter:
+  rules:
+    avoid_print: true
+    use_key_in_widget_constructors: true
+    sized_box_for_whitespace: true
+    # 아래 규칙은 kIsWeb 등 런타임 조건부 코드와 충돌하여 비활성화
+    prefer_const_constructors: false
+    prefer_const_declarations: false
+    prefer_const_literals_to_create_immutables: false

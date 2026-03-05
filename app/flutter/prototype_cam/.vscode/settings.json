@@ -1,0 +1,12 @@
+{
+  "editor.formatOnSave": true,
+  "editor.formatOnType": true,
+  "[dart]": {
+    "editor.defaultFormatter": "Dart-Code.dart-code",
+    "editor.rulers": [80],
+    "editor.tabSize": 2
+  },
+  "dart.flutterRunAdditionalArgs": [],
+  "dart.debugExternalPackageLibraries": false,
+  "dart.debugSdkLibraries": false
+}
