@@ -17,10 +17,9 @@ class MyApp extends StatelessWidget {
     return ChangeNotifierProvider(
       create: (_) => CaptureProvider()..loadTasks(),
       child: MaterialApp(
-        title: 'Keeper Cam',
+        title: 'Keeper Screenshot',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.theme,
-        // 반응형: 고정 프레임 없이 화면 100% 사용
         home: const CaptureScreen(),
       ),
     );

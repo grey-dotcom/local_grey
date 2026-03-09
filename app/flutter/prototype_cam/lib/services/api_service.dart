@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 
 class ApiService {
+  // [BE 인수인계] 실서버 연동 시 _baseUrl 교체 + _mockMode = false
   static const String _baseUrl = 'https://api.your-backend.com';
   static const bool _mockMode = true;
 
@@ -46,7 +47,6 @@ class ApiService {
       final response = await http.Response.fromStream(streamedResponse);
       if (response.statusCode == 200 || response.statusCode == 201) {
         // [BE 인수인계] 실제 API 응답 JSON 구조에 맞춰 파싱 필요.
-        // 현재는 로컸 인지용으로 최소 필드만 반환.
         // 예시 응답: { "id": "...", "url": "...", "item_id": "...", "group_id": "..." }
         try {
           final json = jsonDecode(response.body) as Map<String, dynamic>;
@@ -58,7 +58,6 @@ class ApiService {
             'id': json['id'],
           };
         } catch (_) {
-          // 응답 본문 파싱 실패 시 기본값 반환 (업로드 성공 자체는 유지)
           return {'status': 'ok', 'item_id': itemId, 'group_id': groupId};
         }
       } else {

@@ -30,22 +30,34 @@ class TaskListModal extends StatelessWidget {
             decoration: const BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              boxShadow: [
+                BoxShadow(
+                  color: Color(0x1F000000),
+                  blurRadius: 32,
+                  offset: Offset(0, -4),
+                ),
+              ],
             ),
             child: Column(
               children: [
                 _ModalHeader(),
                 Expanded(
                   child: ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                    padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
                     itemCount: items.length,
                     itemBuilder: (context, index) {
                       final entry = items[index];
                       if (entry is _GroupHeader) {
-                        return _GroupSectionHeader(title: entry.title);
+                        return _GroupSectionHeader(
+                          title: entry.title,
+                          isFirst: index == 0,
+                          isActive: entry.groupIndex == provider.groupIndex,
+                        );
                       }
                       final data = entry as _ItemData;
                       return Padding(
-                        padding: const EdgeInsets.only(bottom: 10),
+                        // 피그마: gap:12px
+              padding: const EdgeInsets.only(bottom: 12),
                         child: _TaskCard(
                           item: data.item,
                           globalIndex: data.globalIndex,
@@ -76,7 +88,7 @@ class TaskListModal extends StatelessWidget {
     int globalIdx = 0;
     for (var gIdx = 0; gIdx < provider.groups.length; gIdx++) {
       final group = provider.groups[gIdx];
-      list.add(_GroupHeader(title: group.title));
+      list.add(_GroupHeader(title: group.title, groupIndex: gIdx));
       for (var iIdx = 0; iIdx < group.items.length; iIdx++) {
         globalIdx++;
         list.add(_ItemData(
@@ -94,7 +106,8 @@ class TaskListModal extends StatelessWidget {
 // flat list 데이터 타입
 class _GroupHeader {
   final String title;
-  const _GroupHeader({required this.title});
+  final int groupIndex;
+  const _GroupHeader({required this.title, required this.groupIndex});
 }
 
 class _ItemData {
@@ -115,7 +128,8 @@ class _ModalHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(24, 20, 20, 20),
+      // HTML: padding: 20px 24px
+      padding: const EdgeInsets.fromLTRB(24, 20, 16, 20),
       decoration: const BoxDecoration(
         border: Border(bottom: BorderSide(color: Color(0xFFF1F5F9))),
       ),
@@ -134,14 +148,10 @@ class _ModalHeader extends StatelessWidget {
           const Spacer(),
           GestureDetector(
             onTap: () => Navigator.pop(context),
-            child: Container(
-              width: 36,
-              height: 36,
-              decoration: const BoxDecoration(
-                color: Color(0xFFF1F5F9),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.close, size: 18, color: Color(0xFF64748B)),
+            child: const SizedBox(
+              width: 40,
+              height: 40,
+              child: Icon(Icons.close, size: 24, color: Color(0xFF64748B)),
             ),
           ),
         ],
@@ -153,20 +163,28 @@ class _ModalHeader extends StatelessWidget {
 // ── 그룹 섹션 헤더 ─────────────────────────────────────────
 class _GroupSectionHeader extends StatelessWidget {
   final String title;
-  const _GroupSectionHeader({required this.title});
+  final bool isFirst;
+  final bool isActive;
+  const _GroupSectionHeader({
+    required this.title,
+    this.isFirst = false,
+    this.isActive = false,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(4, 20, 4, 8),
+      // HTML: padding: 20px 4px 12px, first-child padding-top:0
+      // 피그마: font-size:16px, color:#0F172A (항상 동일 - active/inactive 구분 없음)
+      padding: EdgeInsets.fromLTRB(4, isFirst ? 0 : 20, 4, 12),
       child: Text(
         title,
         style: const TextStyle(
           fontFamily: _font,
           color: Color(0xFF0F172A),
-          fontSize: 15,
+          fontSize: 16,
           fontWeight: FontWeight.w700,
-          height: 1.4,
+          height: 1.5,
         ),
       ),
     );
@@ -232,11 +250,13 @@ class _TaskCard extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.all(14),
+        // HTML: border-radius:32px, padding:16px
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: const Color(0xFFEFF6FF),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: AppTheme.blue, width: 1.5),
+          borderRadius: BorderRadius.circular(32),
+          border: Border.all(color: AppTheme.blue, width: 1),
+          boxShadow: [BoxShadow(color: Colors.black.withAlpha(13), blurRadius: 2, offset: const Offset(0, 1))],
         ),
         child: Row(
           children: [
@@ -253,17 +273,18 @@ class _TaskCard extends StatelessWidget {
                             style: const TextStyle(
                               fontFamily: _font,
                               color: AppTheme.blue,
-                              fontSize: 15,
+                              // HTML: font-size:16px, weight:700
+                              fontSize: 16,
                               fontWeight: FontWeight.w700,
                               height: 1.4,
                             )),
                       ),
-                      const SizedBox(width: 6),
+                      const SizedBox(width: 8),
                       _Badge(label: '완료', blue: true),
                     ],
                   ),
-                  const SizedBox(height: 2),
-                  _MandatoryLabel(isMandatory: item.isMandatory, active: true),
+                  const SizedBox(height: 4),
+                  _MandatoryLabel(isMandatory: item.isMandatory, active: true, done: true),
                 ],
               ),
             ),
@@ -279,11 +300,12 @@ class _TaskCard extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: const Color(0xFFEFF6FF),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: AppTheme.blue, width: 1.5),
+          borderRadius: BorderRadius.circular(32),
+          border: Border.all(color: AppTheme.blue, width: 1),
+          boxShadow: [BoxShadow(color: Colors.black.withAlpha(13), blurRadius: 2, offset: const Offset(0, 1))],
         ),
         child: Row(
           children: [
@@ -300,17 +322,17 @@ class _TaskCard extends StatelessWidget {
                             style: const TextStyle(
                               fontFamily: _font,
                               color: AppTheme.blue,
-                              fontSize: 15,
+                              fontSize: 16,
                               fontWeight: FontWeight.w700,
                               height: 1.4,
                             )),
                       ),
-                      const SizedBox(width: 6),
+                      const SizedBox(width: 8),
                       _Badge(label: '진행중', blue: true),
                     ],
                   ),
-                  const SizedBox(height: 2),
-                  _MandatoryLabel(isMandatory: item.isMandatory, active: true),
+                  const SizedBox(height: 4),
+                  _MandatoryLabel(isMandatory: item.isMandatory, active: true, done: false),
                 ],
               ),
             ),
@@ -326,10 +348,10 @@ class _TaskCard extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(32),
           border: Border.all(color: const Color(0xFFF1F5F9)),
         ),
         child: Row(
@@ -346,18 +368,19 @@ class _TaskCard extends StatelessWidget {
                         child: Text(item.title,
                             style: const TextStyle(
                               fontFamily: _font,
-                              color: Color(0xFF0F172A),
-                              fontSize: 15,
+                              color: Color(0xFF475569),
+                              // HTML: font-size:16px, weight:500
+                              fontSize: 16,
                               fontWeight: FontWeight.w500,
                               height: 1.4,
                             )),
                       ),
-                      const SizedBox(width: 6),
+                      const SizedBox(width: 8),
                       _Badge(label: '완료', blue: false),
                     ],
                   ),
-                  const SizedBox(height: 2),
-                  _MandatoryLabel(isMandatory: item.isMandatory, active: false),
+                  const SizedBox(height: 4),
+                  _MandatoryLabel(isMandatory: item.isMandatory, active: false, done: true),
                 ],
               ),
             ),
@@ -373,10 +396,10 @@ class _TaskCard extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(32),
           border: Border.all(color: const Color(0xFFF1F5F9)),
         ),
         child: Row(
@@ -394,17 +417,17 @@ class _TaskCard extends StatelessWidget {
                             style: const TextStyle(
                               fontFamily: _font,
                               color: Color(0xFF475569),
-                              fontSize: 15,
+                              fontSize: 16,
                               fontWeight: FontWeight.w500,
                               height: 1.4,
                             )),
                       ),
-                      const SizedBox(width: 6),
+                      const SizedBox(width: 8),
                       _Badge(label: '대기', blue: false),
                     ],
                   ),
-                  const SizedBox(height: 2),
-                  _MandatoryLabel(isMandatory: item.isMandatory, active: false),
+                  const SizedBox(height: 4),
+                  _MandatoryLabel(isMandatory: item.isMandatory, active: false, done: false),
                 ],
               ),
             ),
@@ -466,11 +489,12 @@ class _Badge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // HTML: padding: 2px 8px, border-radius: 9999px (pill)
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
         color: blue ? AppTheme.blue : const Color(0xFFF1F5F9),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(9999),
       ),
       child: Text(label,
           style: TextStyle(
@@ -485,20 +509,23 @@ class _Badge extends StatelessWidget {
 
 class _MandatoryLabel extends StatelessWidget {
   final bool isMandatory;
-  final bool active;
-  const _MandatoryLabel({required this.isMandatory, required this.active});
+  final bool active; // isCurrent
+  final bool done;  // isDone
+  const _MandatoryLabel({required this.isMandatory, required this.active, required this.done});
 
   @override
   Widget build(BuildContext context) {
+    // 피그마 기준:
+    // 필수 활성(isCurrent): #3B82F6, weight:700
+    // 필수 완료/대기: #3B82F6, weight:500
+    // 선택: #64748B, weight:500
     return Text(
       isMandatory ? '필수' : '선택',
       style: TextStyle(
         fontFamily: _font,
-        color: isMandatory
-            ? (active ? AppTheme.blue : AppTheme.blue.withAlpha(160))
-            : const Color(0xFF94A3B8),
+        color: isMandatory ? AppTheme.blue : const Color(0xFF64748B),
         fontSize: 12,
-        fontWeight: FontWeight.w500,
+        fontWeight: active && !done ? FontWeight.w700 : FontWeight.w500,
         height: 1.33,
       ),
     );
@@ -511,8 +538,9 @@ class _ArrowCircle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // HTML: chevron 32×32
     return Container(
-      width: 28, height: 28,
+      width: 32, height: 32,
       decoration: BoxDecoration(
         color: blue ? Colors.white : const Color(0xFFF8FAFC),
         shape: BoxShape.circle,
@@ -521,8 +549,8 @@ class _ArrowCircle extends StatelessWidget {
             : null,
       ),
       child: Icon(Icons.chevron_right,
-          size: 16,
-          color: blue ? AppTheme.blue : const Color(0xFFCBD5E1)),
+          size: 20,
+          color: blue ? AppTheme.blue : const Color(0xFF94A3B8)),
     );
   }
 }

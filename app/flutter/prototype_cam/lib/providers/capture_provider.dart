@@ -50,6 +50,7 @@ class CaptureProvider extends ChangeNotifier {
 
   bool _isContentsExpanded = false;
   bool _isCapturing = false;
+  DateTime? _lastCaptureTime;
 
   final WebCameraService _cameraService = WebCameraService();
   CameraPermission _cameraPermission = CameraPermission.unknown;
@@ -69,6 +70,7 @@ class CaptureProvider extends ChangeNotifier {
   TaskItem? get currentItem => currentGroup?.items[_itemIndex];
   bool get isContentsExpanded => _isContentsExpanded;
   bool get isCapturing => _isCapturing;
+  DateTime? get lastCaptureTime => _lastCaptureTime;
   CameraPermission get cameraPermission => _cameraPermission;
   bool get cameraReady => _cameraReady;
   String? get cameraViewId => _viewId;
@@ -116,7 +118,7 @@ class CaptureProvider extends ChangeNotifier {
   int get mandatoryTotalCount =>
       _groups.fold(0, (sum, g) => sum + g.mandatoryItems.length);
 
-  // ── 초기화 ───────────────────────────────────────────────
+  // ── 초기화 ─────────────────────────────────────────────────────────────────
   Future<void> loadTasks() async {
     _isLoading = true;
     _error = null;
@@ -163,15 +165,16 @@ class CaptureProvider extends ChangeNotifier {
     _cameraPermission = CameraPermission.unknown;
     _cameraReady = false;
     _viewId = null;
+    _cameraService.stop();
     notifyListeners();
     await _initCamera();
   }
 
-  // ── 네비게이션 ────────────────────────────────────────────
+  // ── 네비게이션 ─────────────────────────────────────────────────────────────
   void _navigateTo(int groupIdx, int itemIdx) {
     _groupIndex = groupIdx;
     _itemIndex = itemIdx;
-    _isContentsExpanded = false;
+    // _isContentsExpanded 유지: 사용자 마지막 드롭다운 상태 보존 (도안 이동 시 리셋 없음)
     notifyListeners();
   }
 
@@ -186,7 +189,6 @@ class CaptureProvider extends ChangeNotifier {
     if (_itemIndex < currentGroup!.items.length - 1) {
       _navigateTo(_groupIndex, _itemIndex + 1);
     } else if (_groupIndex < _groups.length - 1) {
-      // 그룹 마지막 도안 → 다음 그룹 첫 도안
       _navigateTo(_groupIndex + 1, 0);
     }
   }
@@ -195,16 +197,12 @@ class CaptureProvider extends ChangeNotifier {
     if (_itemIndex > 0) {
       _navigateTo(_groupIndex, _itemIndex - 1);
     } else if (_groupIndex > 0) {
-      // 그룹 첫 도안 → 이전 그룹 마지막 도안
       final prevGroup = _groups[_groupIndex - 1];
       _navigateTo(_groupIndex - 1, prevGroup.items.length - 1);
     }
   }
 
-  // ── 촬영 ─────────────────────────────────────────────────
-  /// 촬영 후 자동이동:
-  /// - 현재 그룹에 미완료 도안 있으면 → 첫 미완료 도안
-  /// - 없으면 → 다음 그룹 첫 도안 (마지막 그룹이면 그 자리 유지)
+  // ── 촬영 ─────────────────────────────────────────────────────────────────
   Future<void> capture() async {
     if (_isCapturing || currentItem == null || !_cameraReady) return;
 
@@ -215,6 +213,8 @@ class CaptureProvider extends ChangeNotifier {
     final group = currentGroup!;
     final capturedGroupIdx = _groupIndex;
     final capturedItemIdx = _itemIndex;
+    final wasRecapture = isItemCaptured(item.id); // 촬영 전 재촬영 여부
+    final wasAllMandatoryDone = allMandatoryCaptured; // 촬영 전 필수 완료 여부
 
     try {
       final bytes = await _cameraService.capture();
@@ -223,8 +223,10 @@ class CaptureProvider extends ChangeNotifier {
       _captures[item.id] =
           CaptureResult(bytes: bytes, status: UploadStatus.uploading);
 
-      _autoAdvance(capturedGroupIdx, capturedItemIdx);
       _isCapturing = false;
+      _lastCaptureTime = DateTime.now(); // 말풍선 트리거: autoAdvance 이전에 갱신
+      _autoAdvance(capturedGroupIdx, capturedItemIdx,
+          wasRecapture: wasRecapture, wasAllMandatoryDone: wasAllMandatoryDone);
       notifyListeners();
 
       _uploadInBackground(bytes: bytes, itemId: item.id, groupId: group.id);
@@ -236,24 +238,54 @@ class CaptureProvider extends ChangeNotifier {
     }
   }
 
-  void _autoAdvance(int capturedGroupIdx, int capturedItemIdx) {
-    // 촬영된 도안 다음부터 전체 순회하여 첫 미촬영 도안으로 이동
-    // 이미 촬영된 도안은 건너뜀 (촬영 후 재촬영 화면 방지)
+  void _autoAdvance(int capturedGroupIdx, int capturedItemIdx,
+      {required bool wasRecapture, required bool wasAllMandatoryDone}) {
+
+    // [재촬영 + 필수 완료] → 순서상 다음 도안 이동 (선택 포함), 마지막이면 루프
+    if (wasRecapture && wasAllMandatoryDone) {
+      final isLast = capturedGroupIdx == _groups.length - 1 &&
+          capturedItemIdx == _groups.last.items.length - 1;
+      if (isLast) {
+        _groupIndex = 0;
+        _itemIndex = 0;
+      } else if (capturedItemIdx < _groups[capturedGroupIdx].items.length - 1) {
+        _groupIndex = capturedGroupIdx;
+        _itemIndex = capturedItemIdx + 1;
+      } else {
+        _groupIndex = capturedGroupIdx + 1;
+        _itemIndex = 0;
+      }
+      return;
+    }
+
+    // [재촬영 + 필수 미완료] → 첫 미촬영 필수 도안으로 이동
+    if (wasRecapture && !wasAllMandatoryDone) {
+      for (int g = 0; g < _groups.length; g++) {
+        for (final item in _groups[g].mandatoryItems) {
+          if (!isItemCaptured(item.id)) {
+            _groupIndex = g;
+            _itemIndex = _groups[g].items.indexOf(item);
+            return;
+          }
+        }
+      }
+      // (fallthrough → 다음 미촬영 도안 탐색)
+    }
+
+    // [일반 촬영] → 다음 미촬영 도안 (촬영된 건 건너뜀)
     for (int g = capturedGroupIdx; g < _groups.length; g++) {
       final startI = (g == capturedGroupIdx) ? capturedItemIdx + 1 : 0;
       for (int i = startI; i < _groups[g].items.length; i++) {
         if (!isItemCaptured(_groups[g].items[i].id)) {
           _groupIndex = g;
           _itemIndex = i;
-          _isContentsExpanded = false;
           return;
         }
       }
     }
-    // 이후 모든 도안 촬영 완료 → 마지막 그룹 마지막 도안으로 이동 (업무완료 버튼 노출)
+    // 전체 완료 → 마지막 도안 유지 (업무완료 버튼 노출)
     _groupIndex = _groups.length - 1;
     _itemIndex = _groups.last.items.length - 1;
-    _isContentsExpanded = false;
   }
 
   Future<void> _uploadInBackground({
@@ -283,7 +315,7 @@ class CaptureProvider extends ChangeNotifier {
     }
   }
 
-  // ── UI ───────────────────────────────────────────────────
+  // ── UI ─────────────────────────────────────────────────────────────────────
   void toggleContents() {
     _isContentsExpanded = !_isContentsExpanded;
     notifyListeners();

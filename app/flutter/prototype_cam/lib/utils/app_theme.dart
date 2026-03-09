@@ -20,9 +20,9 @@ class AppTheme {
       ),
       scaffoldBackgroundColor: Colors.black,
       textTheme: const TextTheme(
-        bodyLarge:  TextStyle(fontFamily: _font, color: charcoal, fontSize: 16),
+        bodyLarge: TextStyle(fontFamily: _font, color: charcoal, fontSize: 16),
         bodyMedium: TextStyle(fontFamily: _font, color: charcoal, fontSize: 14),
-        bodySmall:  TextStyle(fontFamily: _font, color: gray,     fontSize: 12),
+        bodySmall: TextStyle(fontFamily: _font, color: gray, fontSize: 12),
       ),
     );
   }

@@ -1,0 +1,29 @@
+# =============================================
+# local_grey 루트 .gitignore
+# =============================================
+
+# macOS 시스템 파일 (자동 생성, 불필요)
+.DS_Store
+**/.DS_Store
+
+# 환경변수 (API 키 등 민감 정보 — 절대 올리면 안 됨)
+.env
+.env.*
+
+# 로컬 git 저장소 (GitHub과 별개로 로컬에서만 사용하는 폴더)
+git_repo/
+
+# IDE 설정 (개인 환경마다 달라서 공유 불필요)
+*.code-workspace
+.vscode/
+
+# Next.js 프로젝트 (지금은 prototype_cam만 배포)
+web/
+
+# 임시 작업 폴더
+workspace/
+
+# 배포 로그 (로컬에서만 기록, GitHub에 올릴 필요 없음)
+deploy/deploy.log
+deploy/LATEST_DEPLOY.txt
+deploy/production/

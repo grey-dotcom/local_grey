@@ -64,9 +64,7 @@ lib/
 └── widgets/
     ├── camera_view.dart             # Web HtmlElementView 래퍼
     ├── guide_card.dart              # 촬영 가이드 카드
-    ├── task_list_modal.dart         # 업무 목록 모달
-    ├── shutter_button.dart          # 셔터 버튼
-    └── pagination_indicator.dart    # 도안 페이지 인디케이터
+    └── task_list_modal.dart         # 업무 목록 모달
 
 assets/
 └── task_data.json                   # 업무/도안 목 데이터 (API 연동 전 사용)
@@ -216,6 +214,21 @@ final response = await _api.fetchTaskGroups(workOrderId: workOrderId);
 - [ ] 다양한 화면 크기에서 레이아웃 깨짐 없음
 - [ ] 모달 열기/닫기 정상 동작
 - [ ] 촬영 결과 프리뷰 핀치줌 동작
+
+---
+
+## 클론 후 정리 필요 항목
+
+저장소 클론 후 아래 파일을 삭제해야 합니다 (이미 내용은 비워진 상태, 실제 파일 제거 필요):
+
+```bash
+git rm lib/widgets/shutter_button.dart     # _ShutterButton (private)으로 대체됨
+git rm lib/widgets/pagination_indicator.dart  # guide_card.dart에 인라인 통합됨
+git rm -r assets/fonts/   # CDN 폰트 사용 (로컬 파일 없음)
+git rm -r assets/images/  # 미사용
+git rm test/widget_test.dart  # 형식적 스모크 테스트, 실 검증 없음
+git commit -m "chore: remove unused files"
+```
 
 ---
 

@@ -22,5 +22,6 @@ class TaskGroup {
             .toList(),
       );
 
-  List<TaskItem> get mandatoryItems => items.where((i) => i.isMandatory).toList();
+  List<TaskItem> get mandatoryItems =>
+      items.where((i) => i.isMandatory).toList();
 }

@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/capture_provider.dart';
@@ -9,15 +10,12 @@ import '../widgets/task_list_modal.dart';
 
 const _font = 'Spoqa Han Sans Neo';
 
-// ──────────────────────────────────────────────────────────
-// 레이아웃 상수 (HTML 수치 기반)
-//   카메라 영역 619.5px 기준:
-//   셔터(84px)   top:455.5  → center=497.5 → bottom=122 → SafeArea 고려 100
-//   썸네일(56px) top:14 (셔터 컨테이너 내) → (84-56)/2=14 → bottom=114
-//   업무완료     top:567.5  → bottom=619.5-567.5-36=16  → 28
-// ──────────────────────────────────────────────────────────
-const double _shutterBottom  = 100.0;
-const double _thumbBottom    = 114.0;  // _shutterBottom + (84-56)/2
+// ── 레이아웃 상수 (390px 기준) ──
+const double _shutterBottom  =  80.0;
+const double _thumbBottom    =  96.0;  // 셔터 center(122) - 썸네일 절반(26)
+const double _thumbSize      =  52.0;
+const double _shutterRadius  =  42.0;  // 셔터 외경(84) / 2
+const double _thumbGap       =  50.0;  // 셔터 왼쪽 엣지 기준 썸네일 오른쪽 끝까지 거리
 const double _completeBottom =  28.0;
 const double _sideInset      =  24.0;
 
@@ -50,42 +48,37 @@ class CaptureScreen extends StatelessWidget {
                 Expanded(
                   child: Stack(
                     children: [
-                      // ① 카메라
                       const Positioned.fill(child: _LiveCamera()),
-
-                      // ② 힌트 pill
-                      Positioned(
-                        top: 32, left: 0, right: 0,
-                        child: _HintPill(),
+                      Positioned.fill(
+                        child: IgnorePointer(
+                          child: Container(color: Colors.black.withAlpha(102)),
+                        ),
                       ),
-
-                      // ③ 스와이프 화살표
+                      Positioned(top: 32, left: 0, right: 0, child: _HintPill()),
+                      const _CaptureDoneBubbleOverlay(),
                       const Positioned.fill(child: _SwipeArrows()),
-
-                      // ④ 업로드 인디케이터
                       if (provider.currentCapture?.status == UploadStatus.uploading)
                         const Positioned(top: 12, right: 12, child: _UploadIndicator()),
-
-                      // ⑤ 썸네일 — 셔터 중앙과 수직 정렬, 좌측
                       if (provider.isRecaptureMode)
-                        Positioned(
-                          bottom: _thumbBottom,
-                          left: _sideInset,
-                          child: _Thumbnail(
-                            bytes: provider.currentCapture!.bytes,
-                            uploadStatus: provider.currentCapture!.status,
-                          ),
-                        ),
-
-                      // ⑥ 셔터 버튼 — 수평 중앙, bottom 고정
+                        Builder(builder: (ctx) {
+                          // 셔터 왼쪽 엣지 기준으로 썸네일 오른쪽 끝 위치 고정
+                          // thumbLeft = 화면너비/2 - 셔터반지름 - gap - 썸네일크기
+                          final w = MediaQuery.of(ctx).size.width;
+                          final thumbLeft = w / 2 - _shutterRadius - _thumbGap - _thumbSize;
+                          return Positioned(
+                            bottom: _thumbBottom,
+                            left: thumbLeft,
+                            child: _Thumbnail(
+                              bytes: provider.currentCapture!.bytes,
+                              uploadStatus: provider.currentCapture!.status,
+                              size: _thumbSize,
+                            ),
+                          );
+                        }),
                       Positioned(
                         bottom: _shutterBottom, left: 0, right: 0,
                         child: Center(child: _ShutterButton(provider: provider)),
                       ),
-
-                      // ⑦ 업무완료 버튼 — 마지막 도안에서만, 우측 하단
-                      //    active:   #3B82F6 불투명 (HTML 기준)
-                      //    inactive: #94A3B8 50% 투명
                       if (provider.isLastItem)
                         Positioned(
                           bottom: _completeBottom,
@@ -227,8 +220,8 @@ class _NavBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final provider = context.watch<CaptureProvider>();
     return Container(
-      height: 52,
-      padding: const EdgeInsets.symmetric(horizontal: 4),
+      height: 64,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
       decoration: const BoxDecoration(
           border: Border(bottom: BorderSide(color: Color(0xFFF1F5F9)))),
       child: Row(
@@ -247,7 +240,7 @@ class _NavBar extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(width: 48),
+          const SizedBox(width: 40, height: 40),
         ],
       ),
     );
@@ -258,9 +251,13 @@ class _BackButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final provider = context.read<CaptureProvider>();
-    return IconButton(
-      icon: const Icon(Icons.chevron_left, size: 28, color: Color(0xFF0F172A)),
-      onPressed: () => _handleBack(context, provider),
+    return SizedBox(
+      width: 40, height: 40,
+      child: IconButton(
+        padding: EdgeInsets.zero,
+        icon: const Icon(Icons.chevron_left, size: 28, color: Color(0xFF0F172A)),
+        onPressed: () => _handleBack(context, provider),
+      ),
     );
   }
 
@@ -314,8 +311,7 @@ class _GroupDots extends StatelessWidget {
         final isActive = i == provider.groupIndex;
         return Container(
           margin: const EdgeInsets.symmetric(horizontal: 2),
-          width: isActive ? 8 : 6,
-          height: isActive ? 8 : 6,
+          width: 6, height: 6,
           decoration: BoxDecoration(
             color: isActive ? AppTheme.blue : const Color(0xFFE2E8F0),
             shape: BoxShape.circle,
@@ -328,7 +324,6 @@ class _GroupDots extends StatelessWidget {
 
 // ══════════════════════════════════════════════════════════
 // 힌트 Pill
-// HTML: px-[12] py-[4] bg-black/20 rounded-full backdrop-blur
 // ══════════════════════════════════════════════════════════
 class _HintPill extends StatelessWidget {
   @override
@@ -340,17 +335,14 @@ class _HintPill extends StatelessWidget {
 
     return Center(
       child: Container(
-        constraints: const BoxConstraints(maxWidth: 342),
         margin: const EdgeInsets.symmetric(horizontal: 24),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
         decoration: BoxDecoration(
-          color: Colors.black.withAlpha(51), // bg-black/20
+          color: Colors.black.withAlpha(51),
           borderRadius: BorderRadius.circular(9999),
           boxShadow: [
-            BoxShadow(color: Colors.black.withAlpha(18),
-                blurRadius: 3, offset: const Offset(0, 4)),
-            BoxShadow(color: Colors.black.withAlpha(15),
-                blurRadius: 2, offset: const Offset(0, 2)),
+            BoxShadow(color: Colors.black.withAlpha(18), blurRadius: 3, offset: const Offset(0, 4)),
+            BoxShadow(color: Colors.black.withAlpha(15), blurRadius: 2, offset: const Offset(0, 2)),
           ],
         ),
         child: Text(hint,
@@ -362,6 +354,168 @@ class _HintPill extends StatelessWidget {
       ),
     );
   }
+}
+
+// ══════════════════════════════════════════════════════════
+// 촬영완료 말풍선 오버레이
+// fadeIn 200ms → 1300ms 유지 → fadeOut 200ms
+// ══════════════════════════════════════════════════════════
+class _CaptureDoneBubbleOverlay extends StatefulWidget {
+  const _CaptureDoneBubbleOverlay();
+
+  @override
+  State<_CaptureDoneBubbleOverlay> createState() =>
+      _CaptureDoneBubbleOverlayState();
+}
+
+class _CaptureDoneBubbleOverlayState
+    extends State<_CaptureDoneBubbleOverlay>
+    with SingleTickerProviderStateMixin {
+  DateTime? _trackedTime;
+  bool _visible = false;
+  AnimationController? _animCtrl;
+  Animation<double>? _fadeAnim;
+  Animation<Offset>? _slideAnim;
+
+  @override
+  void initState() {
+    super.initState();
+    _setupAnim();
+  }
+
+  void _setupAnim() {
+    _animCtrl?.dispose();
+    final ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 200),
+    );
+    _animCtrl = ctrl;
+    _fadeAnim = CurvedAnimation(parent: ctrl, curve: Curves.easeOut);
+    _slideAnim = Tween<Offset>(
+      begin: const Offset(0, 0.3),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: ctrl, curve: Curves.easeOut));
+  }
+
+  @override
+  void dispose() {
+    _animCtrl?.dispose();
+    super.dispose();
+  }
+
+  void _show() {
+    if (!mounted) return;
+    if (_animCtrl == null) _setupAnim();
+    setState(() => _visible = true);
+    _animCtrl!.forward(from: 0);
+    Future.delayed(const Duration(milliseconds: 1300), () {
+      if (!mounted) return;
+      _animCtrl?.reverse().then((_) {
+        if (mounted) setState(() => _visible = false);
+      });
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final provider = context.watch<CaptureProvider>();
+    final captureTime = provider.lastCaptureTime;
+
+    if (captureTime != null && captureTime != _trackedTime) {
+      _trackedTime = captureTime;
+      WidgetsBinding.instance.addPostFrameCallback((_) => _show());
+    }
+
+    // 항상 Positioned 반환 → Stack 자식 타입 고정 (HtmlElementView remount 방지)
+    return Positioned(
+      left: 0,
+      right: 0,
+      bottom: 172,
+      child: IgnorePointer(
+        child: Opacity(
+          opacity: _visible ? 1.0 : 0.0,
+          child: FadeTransition(
+            opacity: _fadeAnim ?? const AlwaysStoppedAnimation(1.0),
+            child: SlideTransition(
+              position: _slideAnim ?? const AlwaysStoppedAnimation(Offset.zero),
+              child: Center(
+                // Row(mainAxisSize.min) 안에 Column → 수평 tight constraint 해제
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 200),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: BackdropFilter(
+                              filter: ui.ImageFilter.blur(sigmaX: 2, sigmaY: 2),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: const Color(0x1A137FEC), // rgba(19,127,236,0.10)
+                                  borderRadius: BorderRadius.circular(8),
+                                  boxShadow: [
+                                    BoxShadow(color: Colors.black.withAlpha(26), blurRadius: 6, spreadRadius: -4, offset: const Offset(0, 4)),
+                                    BoxShadow(color: Colors.black.withAlpha(26), blurRadius: 15, spreadRadius: -3, offset: const Offset(0, 10)),
+                                  ],
+                                ),
+                                child: const Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  children: [
+                                    Text('사진 촬영 완료',
+                                      textAlign: TextAlign.center,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(fontFamily: _font, color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700, height: 1.625)),
+                                    Text('다음 업무 사진을 촬영해주세요',
+                                      textAlign: TextAlign.center,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(fontFamily: _font, color: Colors.white, fontSize: 12, fontWeight: FontWeight.w400, height: 1.625)),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        CustomPaint(
+                          size: const Size(14, 7),
+                          painter: _BubbleTailPainter(),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BubbleTailPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = const Color(0x1A137FEC)
+      ..style = PaintingStyle.fill;
+    final path = Path()
+      ..moveTo(0, 0)
+      ..lineTo(size.width, 0)
+      ..lineTo(size.width / 2, size.height)
+      ..close();
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(_) => false;
 }
 
 // ══════════════════════════════════════════════════════════
@@ -407,25 +561,35 @@ class _SwipeArrows extends StatelessWidget {
     final hasNext = provider.itemIndex < provider.currentItems.length - 1 ||
         provider.groupIndex < provider.groups.length - 1;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          if (hasPrev)
-            _ArrowButton(
-                icon: Icons.chevron_left,
-                onTap: provider.goPrevItemOrGroup)
-          else
-            const SizedBox(width: 40),
-          if (hasNext)
-            _ArrowButton(
-                icon: Icons.chevron_right,
-                onTap: provider.goNextItemOrGroup)
-          else
-            const SizedBox(width: 40),
-        ],
-      ),
+    return Stack(
+      children: [
+        Positioned(
+          top: 0, bottom: 0, left: 0,
+          width: 64,
+          child: Opacity(
+            opacity: hasPrev ? 1.0 : 0.0,
+            child: IgnorePointer(
+              ignoring: !hasPrev,
+              child: _ArrowButton(
+                  icon: Icons.chevron_left,
+                  onTap: provider.goPrevItemOrGroup),
+            ),
+          ),
+        ),
+        Positioned(
+          top: 0, bottom: 0, right: 0,
+          width: 64,
+          child: Opacity(
+            opacity: hasNext ? 1.0 : 0.0,
+            child: IgnorePointer(
+              ignoring: !hasNext,
+              child: _ArrowButton(
+                  icon: Icons.chevron_right,
+                  onTap: provider.goNextItemOrGroup),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -439,13 +603,14 @@ class _ArrowButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        width: 40, height: 40,
-        decoration: BoxDecoration(
-          color: Colors.black.withAlpha(40),
-          shape: BoxShape.circle,
+      behavior: HitTestBehavior.opaque,
+      child: SizedBox(
+        width: 64,
+        child: Center(
+          child: Icon(icon,
+              color: Colors.white.withAlpha(128),
+              size: 48),
         ),
-        child: Icon(icon, color: Colors.white70, size: 24),
       ),
     );
   }
@@ -453,19 +618,21 @@ class _ArrowButton extends StatelessWidget {
 
 // ══════════════════════════════════════════════════════════
 // 셔터 버튼
-// HTML: w-84 h-84 outline-4 white  /  inner w-68 h-68 bg-white outline-3 black/10
-//       재촬영: inner 안 텍스트 #0F172A
 // ══════════════════════════════════════════════════════════
 class _ShutterButton extends StatelessWidget {
   final CaptureProvider provider;
   const _ShutterButton({required this.provider});
+
+  void _handleShutter(BuildContext context) {
+    provider.capture();
+  }
 
   @override
   Widget build(BuildContext context) {
     final canCapture = !provider.isCapturing && provider.cameraReady;
 
     return GestureDetector(
-      onTap: canCapture ? provider.capture : null,
+      onTap: canCapture ? () => _handleShutter(context) : null,
       behavior: HitTestBehavior.opaque,
       child: Container(
         width: 84, height: 84,
@@ -504,7 +671,7 @@ class _ShutterButton extends StatelessWidget {
                           child: Text('재촬영',
                               style: TextStyle(
                                   fontFamily: _font,
-                                  color: Color(0xFF0F172A), // 흰 inner 위
+                                  color: Color(0xFF0F172A),
                                   fontSize: 15,
                                   fontWeight: FontWeight.w700)))
                       : null,
@@ -517,12 +684,7 @@ class _ShutterButton extends StatelessWidget {
 
 // ══════════════════════════════════════════════════════════
 // 업무완료 버튼
-// HTML active:   bg:#3B82F6 불투명, shadow, backdrop-blur
-// HTML inactive: bg:#94A3B8 50% 투명, shadow 없음
-//
-// [PM 확정]
-//   active  → 탭 시 화면 종료
-//   inactive → 탭 시 첫 미촬영 필수 도안으로 이동
+// active: 필수 완료 시 화면 종료 / inactive: 첫 미촬영 필수 도안으로 이동
 // ══════════════════════════════════════════════════════════
 class _CompleteButton extends StatelessWidget {
   final CaptureProvider provider;
@@ -531,8 +693,6 @@ class _CompleteButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isActive = provider.allMandatoryCaptured;
-
-    // active: #3B82F6 불투명  inactive: #94A3B8 50%
     final bgColor = isActive
         ? const Color(0xFF3B82F6)
         : const Color(0xFF94A3B8).withAlpha(128);
@@ -541,13 +701,10 @@ class _CompleteButton extends StatelessWidget {
       onTap: () => _handleComplete(context, provider),
       behavior: HitTestBehavior.opaque,
       child: Container(
-        // HTML: pl-12 pr-8 py-8
         padding: const EdgeInsets.only(left: 12, right: 8, top: 8, bottom: 8),
         decoration: BoxDecoration(
           color: bgColor,
           borderRadius: BorderRadius.circular(24),
-          // active일 때만 shadow
-          // HTML: 0px 4px 6px -4px rgba(0,0,0,0.10), 0px 10px 15px -3px rgba(0,0,0,0.10)
           boxShadow: isActive
               ? [
                   BoxShadow(
@@ -593,13 +750,12 @@ class _CompleteButton extends StatelessWidget {
 
 // ══════════════════════════════════════════════════════════
 // 썸네일
-// HTML: 56x56, border-radius:24, outline 2px white, opacity:0.80
-//       shadow: 0px 10px 15px -3px / 0px 4px 6px -4px rgba(0,0,0,0.10)
 // ══════════════════════════════════════════════════════════
 class _Thumbnail extends StatelessWidget {
   final Uint8List bytes;
   final UploadStatus uploadStatus;
-  const _Thumbnail({required this.bytes, required this.uploadStatus});
+  final double size;
+  const _Thumbnail({required this.bytes, required this.uploadStatus, this.size = 52});
 
   @override
   Widget build(BuildContext context) {
@@ -608,9 +764,9 @@ class _Thumbnail extends StatelessWidget {
       child: Stack(
         children: [
           Container(
-            width: 56, height: 56,
+            width: size, height: size,
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(24),
+              borderRadius: BorderRadius.circular(14),
               border: Border.all(color: Colors.white, width: 2),
               boxShadow: [
                 BoxShadow(color: Colors.black.withAlpha(26),
@@ -622,11 +778,8 @@ class _Thumbnail extends StatelessWidget {
               ],
             ),
             child: ClipRRect(
-              borderRadius: BorderRadius.circular(22),
-              child: Opacity(
-                opacity: 0.80,
-                child: Image.memory(bytes, fit: BoxFit.cover),
-              ),
+              borderRadius: BorderRadius.circular(12),
+              child: Image.memory(bytes, fit: BoxFit.cover),
             ),
           ),
           if (uploadStatus == UploadStatus.uploading)

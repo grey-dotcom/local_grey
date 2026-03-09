@@ -14,12 +14,12 @@
   <meta http-equiv="Feature-Policy" content="camera 'self'">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
   <link rel="icon" type="image/png" href="favicon.png"/>
-  <title>Keeper Cam</title>
+  <title>Keeper Screenshot</title>
   <link rel="manifest" href="manifest.json">
 
-  <!-- Spoqa Han Sans Neo CDN -->
-  <link rel="preconnect" href="https://cdn.jsdelivr.net">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/spoqa/spoqa-han-sans@latest/css/SpoqaHanSansNeo.css">
+  <!-- Spoqa Han Sans Neo CDN — React와 동일한 CDN 사용 -->
+  <link rel="preconnect" href="https://spoqa.github.io">
+  <link rel="stylesheet" type="text/css" href="https://spoqa.github.io/spoqa-han-sans/css/SpoqaHanSansNeo.css">
 
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -46,6 +46,13 @@
   </style>
 </head>
 <body>
+  <!-- 폰트 preload 요소 — w300~w700 모두 실제 로드하도록 강제 (CanvasKit도 포함) -->
+  <div aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden;opacity:0;pointer-events:none;">
+    <span style="font-family:'Spoqa Han Sans Neo';font-weight:300;">가나다</span>
+    <span style="font-family:'Spoqa Han Sans Neo';font-weight:400;">가나다</span>
+    <span style="font-family:'Spoqa Han Sans Neo';font-weight:500;">가나다</span>
+    <span style="font-family:'Spoqa Han Sans Neo';font-weight:700;">가나다</span>
+  </div>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

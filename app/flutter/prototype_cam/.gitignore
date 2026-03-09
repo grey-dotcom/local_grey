@@ -12,9 +12,10 @@
 .pub-cache/
 .pub/
 
-# IDE 설정
+# IDE 설정 (개인 환경마다 달라서 공유 불필요)
 .idea/
 *.iml
+.vscode/
 
 # macOS 시스템 파일
 .DS_Store
