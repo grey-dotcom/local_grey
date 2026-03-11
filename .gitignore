@@ -34,3 +34,12 @@ workspace/
 deploy/deploy.log
 deploy/LATEST_DEPLOY.txt
 deploy/production/
+
+# Flutter prototype_cam — 빌드/툴/배포 캐시
+app/flutter/prototype_cam/build/
+app/flutter/prototype_cam/.dart_tool/
+app/flutter/prototype_cam/.firebase/
+app/flutter/prototype_cam/.firebaserc
+app/flutter/prototype_cam/firebase.json
+app/flutter/prototype_cam/.vscode/
+app/flutter/prototype_cam/assets/fonts/

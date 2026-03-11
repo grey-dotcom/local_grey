@@ -1,0 +1,13 @@
+{
+  "categories": [
+    { "id": "cat_1", "label": "일반청소" },
+    { "id": "cat_2", "label": "재실청소" },
+    { "id": "cat_3", "label": "딥클리닝" },
+    { "id": "cat_4", "label": "대실청소" }
+  ],
+  "reportTypes": [
+    { "id": "type_1", "label": "분실물 등록" },
+    { "id": "type_2", "label": "소모품 교체" },
+    { "id": "type_3", "label": "유지보수 필요" }
+  ]
+}
