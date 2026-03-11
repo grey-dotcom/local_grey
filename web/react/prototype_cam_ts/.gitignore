@@ -30,3 +30,10 @@ yarn-error.log*
 # TypeScript 빌드 캐시
 *.tsbuildinfo
 next-env.d.ts
+
+# Firebase 배포 캐시 (배포 시 자동 생성)
+.firebase/
+
+# Firebase 설정 (로컬 전용)
+.firebaserc
+firebase.json
