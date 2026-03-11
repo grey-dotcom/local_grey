@@ -25,8 +25,8 @@ class GuideCard extends StatelessWidget {
         final group = provider.currentGroup;
         if (item == null || group == null) return const SizedBox();
 
-        final n = item.order;
-        final total = group.items.length;
+        final n = provider.currentItemGlobalIndex;
+        final total = provider.totalItemCount;
         final isExpanded = provider.isContentsExpanded;
 
         return Container(
@@ -60,6 +60,7 @@ class GuideCard extends StatelessWidget {
                   height: 25,
                   child: Text(
                     item.title,
+                    key: ValueKey('title_${item.id}'),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
@@ -90,6 +91,7 @@ class GuideCard extends StatelessWidget {
                           height: isExpanded ? null : 23,  // 14px × 1.625 = 22.75 ≈ 23
                           child: Text(
                             item.contents,
+                            key: ValueKey('contents_${item.id}'),
                             maxLines: isExpanded ? null : 1,
                             overflow: isExpanded
                                 ? TextOverflow.visible

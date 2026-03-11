@@ -25,3 +25,19 @@ flutter:
   uses-material-design: true
   assets:
     - assets/task_data.json
+    - assets/app_config.json
+    - assets/report_data.json
+
+  fonts:
+    - family: S-Core Dream
+      fonts:
+        - asset: assets/fonts/SCDream2.otf
+          weight: 200
+        - asset: assets/fonts/SCDream4.otf
+          weight: 400
+        - asset: assets/fonts/SCDream5.otf
+          weight: 500
+        - asset: assets/fonts/SCDream6.otf
+          weight: 600
+        - asset: assets/fonts/SCDream7.otf
+          weight: 700

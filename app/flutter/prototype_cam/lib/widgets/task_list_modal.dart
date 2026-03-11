@@ -10,8 +10,71 @@ const _font = 'Spoqa Han Sans Neo';
 /// - width: 화면 너비 100% (반응형)
 /// - height: 화면 92% (상단 마진 8% 유지)
 /// - 전체 그룹 × 전체 도안 표시
-class TaskListModal extends StatelessWidget {
+/// - 모달 오픈 시 현재 도안이 보이는 위치로 자동 스크롤
+class TaskListModal extends StatefulWidget {
   const TaskListModal({super.key});
+
+  @override
+  State<TaskListModal> createState() => _TaskListModalState();
+}
+
+class _TaskListModalState extends State<TaskListModal> {
+  final ScrollController _scrollController = ScrollController();
+
+  // 레이아웃 상수 (높이 추정값)
+  static const double _groupHeaderFirstH = 12.0 + 24.0; // padding-top:0 + text + padding-bottom:12
+  static const double _groupHeaderH      = 20.0 + 24.0 + 12.0; // padding-top:20 + text + padding-bottom:12
+  static const double _cardH             = 88.0; // 카드 내부 padding:16×2 + 콘텐츠
+  static const double _cardGap           = 12.0;
+  static const double _listPaddingTop    = 24.0;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToCurrent());
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _scrollToCurrent() {
+    final provider = context.read<CaptureProvider>();
+    final items = _buildItemList(provider);
+
+    // 현재 도안의 flat list 인덱스 찾기
+    int targetIndex = -1;
+    for (int i = 0; i < items.length; i++) {
+      final entry = items[i];
+      if (entry is _ItemData &&
+          entry.groupIndex == provider.groupIndex &&
+          entry.indexInGroup == provider.itemIndex) {
+        targetIndex = i;
+        break;
+      }
+    }
+    if (targetIndex < 0) return;
+
+    // targetIndex까지의 offset 계산
+    double offset = _listPaddingTop;
+    for (int i = 0; i < targetIndex; i++) {
+      if (items[i] is _GroupHeader) {
+        offset += (i == 0) ? _groupHeaderFirstH : _groupHeaderH;
+      } else {
+        offset += _cardH + _cardGap;
+      }
+    }
+
+    // 현재 도안을 뷰포트 중앙에 오도록 조정
+    final viewportH = _scrollController.position.viewportDimension;
+    final targetOffset = offset - (viewportH / 2) + (_cardH / 2);
+
+    _scrollController.jumpTo(
+      targetOffset.clamp(0.0, _scrollController.position.maxScrollExtent),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -43,6 +106,7 @@ class TaskListModal extends StatelessWidget {
                 _ModalHeader(),
                 Expanded(
                   child: ListView.builder(
+                    controller: _scrollController,
                     padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
                     itemCount: items.length,
                     itemBuilder: (context, index) {

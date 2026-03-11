@@ -1,8 +1,10 @@
 import 'dart:convert';
+import 'dart:math';
 // ignore: avoid_web_libraries_in_flutter
 import 'dart:ui_web' as ui_web;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import '../models/app_config.dart';
 import '../models/task_group.dart';
 import '../models/task_item.dart';
 import '../services/api_service.dart';
@@ -40,6 +42,7 @@ enum CameraPermission { unknown, granted, denied }
 
 class CaptureProvider extends ChangeNotifier {
   List<TaskGroup> _groups = [];
+  AppConfig? _appConfig;
   bool _isLoading = true;
   String? _error;
 
@@ -51,6 +54,7 @@ class CaptureProvider extends ChangeNotifier {
   bool _isContentsExpanded = false;
   bool _isCapturing = false;
   DateTime? _lastCaptureTime;
+  bool _showCaptureBubble = false;  // 촬영완료 말풍선 전용 플래그 — 소비 후 즉시 false
 
   final WebCameraService _cameraService = WebCameraService();
   CameraPermission _cameraPermission = CameraPermission.unknown;
@@ -62,6 +66,7 @@ class CaptureProvider extends ChangeNotifier {
 
   // ── Getters ──────────────────────────────────────────────
   List<TaskGroup> get groups => _groups;
+  AppConfig? get appConfig => _appConfig;
   bool get isLoading => _isLoading;
   String? get error => _error;
   int get groupIndex => _groupIndex;
@@ -71,6 +76,7 @@ class CaptureProvider extends ChangeNotifier {
   bool get isContentsExpanded => _isContentsExpanded;
   bool get isCapturing => _isCapturing;
   DateTime? get lastCaptureTime => _lastCaptureTime;
+  bool get showCaptureBubble => _showCaptureBubble;
   CameraPermission get cameraPermission => _cameraPermission;
   bool get cameraReady => _cameraReady;
   String? get cameraViewId => _viewId;
@@ -112,6 +118,19 @@ class CaptureProvider extends ChangeNotifier {
     return null;
   }
 
+  /// 전체 도안 수 (모든 그룹 합산)
+  int get totalItemCount =>
+      _groups.fold(0, (sum, g) => sum + g.items.length);
+
+  /// 현재 도안의 전체 flat index (1-based)
+  int get currentItemGlobalIndex {
+    int idx = 0;
+    for (int g = 0; g < _groupIndex; g++) {
+      idx += _groups[g].items.length;
+    }
+    return idx + _itemIndex + 1;
+  }
+
   int get mandatoryDoneCount =>
       _groups.fold(0, (sum, g) => sum + g.mandatoryItems.where((i) => isItemCaptured(i.id)).length);
 
@@ -124,6 +143,7 @@ class CaptureProvider extends ChangeNotifier {
     _error = null;
     notifyListeners();
     try {
+      // 업무 데이터
       final raw = await rootBundle.loadString('assets/task_data.json');
       final list = json.decode(raw) as List;
       _groups = list
@@ -131,6 +151,12 @@ class CaptureProvider extends ChangeNotifier {
           .toList();
       _groupIndex = 0;
       _itemIndex = 0;
+
+      // 앱 설정 (지점명 등) + 매 진입 시 6자리 난수 비밀번호
+      final configRaw = await rootBundle.loadString('assets/app_config.json');
+      final configJson = json.decode(configRaw) as Map<String, dynamic>;
+      final accessCode = (100000 + Random().nextInt(900000)).toString();
+      _appConfig = AppConfig.fromJson(configJson, accessCode: accessCode);
     } catch (e) {
       _error = '업무 데이터를 불러오지 못했습니다.';
       debugPrint('[CaptureProvider] loadTasks error: $e');
@@ -223,10 +249,12 @@ class CaptureProvider extends ChangeNotifier {
       _captures[item.id] =
           CaptureResult(bytes: bytes, status: UploadStatus.uploading);
 
-      _isCapturing = false;
-      _lastCaptureTime = DateTime.now(); // 말풍선 트리거: autoAdvance 이전에 갱신
+      _lastCaptureTime = DateTime.now();
+      _showCaptureBubble = true;  // 말풍선 트리거
       _autoAdvance(capturedGroupIdx, capturedItemIdx,
           wasRecapture: wasRecapture, wasAllMandatoryDone: wasAllMandatoryDone);
+      // _isCapturing은 autoAdvance 완료 후 해제 — 연타 시 중간 상태에서 재진입 방지
+      _isCapturing = false;
       notifyListeners();
 
       _uploadInBackground(bytes: bytes, itemId: item.id, groupId: group.id);
@@ -319,6 +347,14 @@ class CaptureProvider extends ChangeNotifier {
   void toggleContents() {
     _isContentsExpanded = !_isContentsExpanded;
     notifyListeners();
+  }
+
+  /// 말풍선을 한 번 노출한 후 호출 — 플래그를 소비해서 중복 노출 차단
+  void consumeCaptureBubble() {
+    if (_showCaptureBubble) {
+      _showCaptureBubble = false;
+      // notifyListeners 호출 불필요 — 이미 말풍선이 리스너에서 애니메이션을 시작한 후 소비됨
+    }
   }
 
   void clearError() {

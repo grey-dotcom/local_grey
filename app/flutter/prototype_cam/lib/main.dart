@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'providers/capture_provider.dart';
-import 'screens/capture_screen.dart';
+import 'providers/report_provider.dart';
+import 'screens/task_list_screen.dart';
 import 'utils/app_theme.dart';
 
 void main() {
@@ -14,13 +15,16 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => CaptureProvider()..loadTasks(),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => CaptureProvider()..loadTasks()),
+        ChangeNotifierProvider(create: (_) => ReportProvider()),
+      ],
       child: MaterialApp(
         title: 'Keeper Screenshot',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.theme,
-        home: const CaptureScreen(),
+        home: const TaskListScreen(),
       ),
     );
   }
