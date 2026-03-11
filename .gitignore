@@ -17,8 +17,15 @@ git_repo/
 *.code-workspace
 .vscode/
 
-# Next.js 프로젝트 (지금은 prototype_cam만 배포)
-web/
+# Next.js 빌드 결과물만 제외 (소스코드는 포함)
+/web/react/prototype_cam_ts/.next/
+/web/react/prototype_cam_ts/out/
+/web/react/prototype_cam_ts/node_modules/
+/web/react/prototype_cam_ts/.env
+/web/react/prototype_cam_ts/.env.local
+/web/react/prototype_cam_ts/.firebase/
+/web/react/prototype_cam_ts/.firebaserc
+/web/react/prototype_cam_ts/firebase.json
 
 # 임시 작업 폴더
 workspace/
