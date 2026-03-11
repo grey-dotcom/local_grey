@@ -2,7 +2,7 @@
 # local_grey 루트 .gitignore
 # =============================================
 
-# macOS 시스템 파일 (자동 생성, 불필요)
+# macOS 시스템 파일
 .DS_Store
 **/.DS_Store
 
@@ -10,36 +10,40 @@
 .env
 .env.*
 
-# 로컬 git 저장소 (GitHub과 별개로 로컬에서만 사용하는 폴더)
+# 로컬 git 저장소
 git_repo/
 
-# IDE 설정 (개인 환경마다 달라서 공유 불필요)
+# IDE 설정
 *.code-workspace
 .vscode/
 
-# Next.js 빌드 결과물만 제외 (소스코드는 포함)
-/web/react/prototype_cam_ts/.next/
-/web/react/prototype_cam_ts/out/
-/web/react/prototype_cam_ts/node_modules/
-/web/react/prototype_cam_ts/.env
-/web/react/prototype_cam_ts/.env.local
-/web/react/prototype_cam_ts/.firebase/
-/web/react/prototype_cam_ts/.firebaserc
-/web/react/prototype_cam_ts/firebase.json
-
-# 임시 작업 폴더
+# 임시 작업 폴더 (로컬 전용)
 workspace/
 
-# 배포 로그 (로컬에서만 기록, GitHub에 올릴 필요 없음)
-deploy/deploy.log
-deploy/LATEST_DEPLOY.txt
-deploy/production/
-
-# Flutter prototype_cam — 빌드/툴/배포 캐시
+# ── Flutter prototype_cam ──────────────────
 app/flutter/prototype_cam/build/
 app/flutter/prototype_cam/.dart_tool/
+app/flutter/prototype_cam/.pub-cache/
+app/flutter/prototype_cam/.pub/
 app/flutter/prototype_cam/.firebase/
 app/flutter/prototype_cam/.firebaserc
 app/flutter/prototype_cam/firebase.json
 app/flutter/prototype_cam/.vscode/
 app/flutter/prototype_cam/assets/fonts/
+app/flutter/prototype_cam/.flutter-plugins
+app/flutter/prototype_cam/.flutter-plugins-dependencies
+
+# ── Next.js prototype_cam_ts ───────────────
+web/react/prototype_cam_ts/.next/
+web/react/prototype_cam_ts/out/
+web/react/prototype_cam_ts/node_modules/
+web/react/prototype_cam_ts/.env
+web/react/prototype_cam_ts/.env.local
+web/react/prototype_cam_ts/.firebase/
+web/react/prototype_cam_ts/.firebaserc
+web/react/prototype_cam_ts/firebase.json
+
+# ── 배포 로그 (로컬에서만 기록) ────────────
+deploy/deploy.log
+deploy/LATEST_DEPLOY.txt
+deploy/production/
