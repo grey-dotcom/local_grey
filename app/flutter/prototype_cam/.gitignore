@@ -44,6 +44,16 @@ android/local.properties
 web/build/
 .dart_tool/chrome-device/
 
+# Firebase 배포 캐시 (배포 시 자동 생성)
+.firebase/
+
+# Firebase 설정 (로컬 전용 — 프로젝트마다 다름)
+.firebaserc
+firebase.json
+
+# 폰트 파일 (용량이 크고 라이선스 민감 — 별도 공유)
+assets/fonts/
+
 # pubspec.lock은 포함 (개발자 간 동일 패키지 버전 보장)
 # !pubspec.lock
 
