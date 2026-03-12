@@ -85,11 +85,17 @@ class TaskCard extends StatelessWidget {
     );
   }
 
-  void _goCapture(BuildContext context) {
+  Future<void> _goCapture(BuildContext context) async {
     provider.jumpToItem(groupIdx, itemIdx);
-    Navigator.of(context).push(MaterialPageRoute(
+
+    // CaptureScreen에서 pop(true)로 돌아오면 모든 필수 촬영 완료 → 토스트 표시
+    final result = await Navigator.of(context).push<bool>(MaterialPageRoute(
       builder: (_) => ChangeNotifierProvider.value(value: provider, child: const CaptureScreen()),
     ));
+
+    if (result == true && context.mounted) {
+      _showCaptureCompleteToast(context);
+    }
   }
 
   void _showGuide(BuildContext context) {
@@ -97,6 +103,112 @@ class TaskCard extends StatelessWidget {
       context: context,
       barrierColor: Colors.black.withAlpha(100),
       builder: (_) => GuideModal(item: item),
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════
+// 촬영 완료 토스트
+// fade in 300ms → 900ms 유지 → fade out 300ms = 총 1500ms
+// ══════════════════════════════════════════════════════════
+void _showCaptureCompleteToast(BuildContext context) {
+  final overlay = Overlay.of(context);
+  late OverlayEntry entry;
+
+  entry = OverlayEntry(
+    builder: (_) => _CaptureCompleteToast(
+      onDismiss: () => entry.remove(),
+    ),
+  );
+
+  overlay.insert(entry);
+}
+
+class _CaptureCompleteToast extends StatefulWidget {
+  final VoidCallback onDismiss;
+  const _CaptureCompleteToast({required this.onDismiss});
+
+  @override
+  State<_CaptureCompleteToast> createState() => _CaptureCompleteToastState();
+}
+
+class _CaptureCompleteToastState extends State<_CaptureCompleteToast>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<double> _fade;
+
+  // 타이밍: fade in 300ms → 900ms 유지 → fade out 300ms = 1500ms 총합
+  static const _fadeIn  = Duration(milliseconds: 300);
+  static const _hold    = Duration(milliseconds: 900);
+  // [버그 수정 노트] _fadeOut unused_field 수정 — _ctrl.duration을 fade out 시 교체해 실제 사용
+  static const _fadeOut = Duration(milliseconds: 300);
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(vsync: this, duration: _fadeIn);
+    _fade = CurvedAnimation(parent: _ctrl, curve: Curves.easeOut);
+
+    // fade in
+    _ctrl.forward().then((_) {
+      // 유지
+      Future.delayed(_hold, () {
+        if (!mounted) return;
+        // fade out — duration을 _fadeOut으로 교체 후 reverse
+        _ctrl.duration = _fadeOut;
+        _ctrl.reverse().then((_) {
+          if (mounted) widget.onDismiss();
+        });
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned(
+      left: 0,
+      right: 0,
+      bottom: MediaQuery.of(context).padding.bottom + 32,
+      child: IgnorePointer(
+        child: FadeTransition(
+          opacity: _fade,
+          child: Center(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF0F172A).withAlpha(230),
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(color: Colors.black.withAlpha(40), blurRadius: 16, offset: const Offset(0, 4)),
+                ],
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.check_circle_rounded, color: Color(0xFF0FE995), size: 18),
+                  SizedBox(width: 8),
+                  Text(
+                    '모든 촬영이 완료되었습니다',
+                    style: TextStyle(
+                      fontFamily: _font,
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      height: 1.4,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

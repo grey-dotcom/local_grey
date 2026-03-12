@@ -1,21 +1,39 @@
-// ignore: avoid_web_libraries_in_flutter
-import 'dart:html' as html;
-import 'dart:typed_data';
+// =============================================================================
+// [개발자 인수인계] Web 카메라 서비스
+//
+// ▶ dart:html → package:web 마이그레이션 (Flutter 3.22+ / Dart 3.4+)
+//   dart:html은 Dart 3.x에서 deprecated되어 컴파일 불가.
+//   package:web + dart:js_interop으로 동일 기능 구현.
+//
+// ▶ 주요 변경점:
+//   - html.VideoElement      → web.HTMLVideoElement
+//   - html.MediaStream       → web.MediaStream
+//   - html.CanvasElement     → web.HTMLCanvasElement
+//   - html.window.navigator  → web.window.navigator
+//   - html.DomException      → web.DOMException
+//   - .toDataUrl()           → .toDataURL()
+//   - getUserMedia 옵션      → MediaStreamConstraints (package:web 타입)
+//   - stream.getTracks()     → JSArray, 인덱스 [] 접근
+// =============================================================================
+
 import 'dart:async';
+import 'dart:js_interop';
+import 'dart:typed_data';
+import 'package:web/web.dart' as web;
 import 'camera_service_interface.dart';
 
 class WebCameraService implements CameraServiceInterface {
-  html.VideoElement? _video;
-  html.MediaStream? _stream;
+  web.HTMLVideoElement? _video;
+  web.MediaStream? _stream;
 
   @override
   bool get isActive => _stream != null && _video != null;
 
   @override
-  Future<html.VideoElement> start({String facingMode = 'environment'}) async {
+  Future<web.HTMLVideoElement> start({String facingMode = 'environment'}) async {
     await stop();
     _stream = await _getStream(facingMode);
-    _video = html.VideoElement()
+    _video = web.HTMLVideoElement()
       ..autoplay = true
       ..muted = true
       ..setAttribute('playsinline', 'true')
@@ -23,17 +41,28 @@ class WebCameraService implements CameraServiceInterface {
       ..style.height = '100%'
       ..style.objectFit = 'cover';
     _video!.srcObject = _stream;
-    await _video!.play();
+    await _video!.play().toDart;
+
     if (_video!.videoWidth == 0) {
       final completer = Completer<void>();
-      void onMeta(_) {
-        if (!completer.isCompleted) completer.complete();
-      }
-      void onErr(_) {
-        if (!completer.isCompleted) completer.completeError(Exception('VideoElement error'));
-      }
-      _video!.onLoadedMetadata.listen(onMeta);
-      _video!.onError.listen(onErr);
+      late StreamSubscription metaSub;
+      late StreamSubscription errSub;
+
+      metaSub = _video!.onLoadedMetadata.listen((_) {
+        if (!completer.isCompleted) {
+          completer.complete();
+          metaSub.cancel();
+          errSub.cancel();
+        }
+      });
+      errSub = _video!.onError.listen((_) {
+        if (!completer.isCompleted) {
+          completer.completeError(Exception('VideoElement error'));
+          metaSub.cancel();
+          errSub.cancel();
+        }
+      });
+
       await completer.future.timeout(
         const Duration(seconds: 8),
         onTimeout: () => throw TimeoutException('카메라 메타데이터 로드 타임아웃'),
@@ -47,70 +76,93 @@ class WebCameraService implements CameraServiceInterface {
 
   void _setVisibility(String value) {
     if (_video == null) return;
-    // video 자체 숨기기
     _video!.style.visibility = value;
 
     // CanvasKit에서 video는 flt-glass-pane의 shadowRoot 안에 있음.
-    // _video.parent로는 shadow DOM 경계를 넘을 수 없으므로
-    // document에서 shadow DOM을 직접 탐색.
-    final glasspane = html.document.querySelector('flt-glass-pane');
+    // [개발자] shadow DOM 경계를 넘어 flt-platform-view 전체를 숨겨야 빈 컨테이너가 남지 않음.
+    final glasspane = web.document.querySelector('flt-glass-pane');
     final shadow = glasspane?.shadowRoot;
     if (shadow == null) return;
 
-    // flt-platform-view 전체를 숨겨야 빈 컨테이너가 남지 않음
     final pvList = shadow.querySelectorAll('flt-platform-view');
-    for (final pv in pvList) {
-      pv.style.visibility = value;
+    for (int i = 0; i < pvList.length; i++) {
+      final pv = pvList.item(i);
+      if (pv != null) {
+        (pv as web.HTMLElement).style.visibility = value;
+      }
     }
   }
 
   @override
   Future<Uint8List?> capture({int quality = 92}) async {
     if (_video == null) return null;
-    final canvas = html.CanvasElement(
-      width: _video!.videoWidth,
-      height: _video!.videoHeight,
-    );
+    final canvas = web.HTMLCanvasElement()
+      ..width = _video!.videoWidth
+      ..height = _video!.videoHeight;
     canvas.context2D.drawImage(_video!, 0, 0);
-    // quality: 0~100 정수 → 0.0~1.0 double로 변환 (/ 100은 double 나눗셈 필요)
-    final dataUrl = canvas.toDataUrl('image/jpeg', quality / 100.0);
+    final dataUrl = canvas.toDataURL('image/jpeg', (quality / 100.0).toJS);
     final base64 = dataUrl.split(',').last;
     return _base64Decode(base64);
   }
 
   @override
   Future<void> stop() async {
-    _stream?.getTracks().forEach((t) => t.stop());
+    // [개발자] package:web에서 getTracks()는 JSArray — 인덱스 [] 접근 사용
+    final tracks = _stream?.getTracks();
+    if (tracks != null) {
+      for (int i = 0; i < tracks.length; i++) {
+        tracks[i].stop();
+      }
+    }
     _video?.srcObject = null;
     _video?.remove();
     _stream = null;
     _video = null;
   }
 
-  Future<html.MediaStream> _getStream(String facingMode) async {
+  Future<web.MediaStream> _getStream(String facingMode) async {
     try {
-      return await html.window.navigator.mediaDevices!.getUserMedia({
+      return await _getUserMedia(facingMode: facingMode, ideal: true);
+    } catch (e) {
+      final name = _errorName(e);
+      if (name == 'NotAllowedError' || name == 'PermissionDeniedError') rethrow;
+      if (name == 'NotFoundError' || name == 'OverconstrainedError') {
+        return await _getUserMedia(facingMode: facingMode, ideal: false);
+      }
+      rethrow;
+    }
+  }
+
+  // [개발자] package:web에서 getUserMedia는 MediaStreamConstraints 타입을 받음.
+  // JSObject로 직접 만들어 MediaStreamConstraints로 캐스팅해서 전달.
+  Future<web.MediaStream> _getUserMedia({
+    required String facingMode,
+    required bool ideal,
+  }) async {
+    final JSObject rawConstraints;
+    if (ideal) {
+      rawConstraints = {
         'video': {
           'facingMode': facingMode,
           'width': {'ideal': 1920},
           'height': {'ideal': 1080},
         },
         'audio': false,
-      });
-    } catch (e) {
-      final name = _errorName(e);
-      if (name == 'NotAllowedError' || name == 'PermissionDeniedError') rethrow;
-      if (name == 'NotFoundError' || name == 'OverconstrainedError') {
-        return await html.window.navigator.mediaDevices!
-            .getUserMedia({'video': true, 'audio': false});
-      }
-      rethrow;
+      }.jsify()! as JSObject;
+    } else {
+      rawConstraints = {
+        'video': true,
+        'audio': false,
+      }.jsify()! as JSObject;
     }
+    // package:web의 getUserMedia는 MediaStreamConstraints를 요구하므로 캐스팅
+    final constraints = rawConstraints as web.MediaStreamConstraints;
+    return await web.window.navigator.mediaDevices.getUserMedia(constraints).toDart;
   }
 
   static String _errorName(Object e) {
     try {
-      if (e is html.DomException) return e.name;
+      if (e is web.DOMException) return e.name;
       final str = e.toString();
       if (str.contains('NotAllowedError')) return 'NotAllowedError';
       if (str.contains('PermissionDeniedError')) return 'PermissionDeniedError';
@@ -121,7 +173,8 @@ class WebCameraService implements CameraServiceInterface {
   }
 
   static Uint8List _base64Decode(String base64) {
-    final decoded = html.window.atob(base64);
+    // [개발자] package:web에서 atob은 web.window.atob()으로 호출
+    final decoded = web.window.atob(base64);
     final bytes = Uint8List(decoded.length);
     for (var i = 0; i < decoded.length; i++) {
       bytes[i] = decoded.codeUnitAt(i);

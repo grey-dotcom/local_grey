@@ -4,7 +4,10 @@ publish_to: 'none'
 version: 1.0.0+1
 
 environment:
-  sdk: '>=3.0.0 <4.0.0'
+  # [버그 수정 노트] SDK 제약 >=3.0.0 → >=3.6.0 으로 상향.
+  # camera_service.dart에서 Dart 3.6 API(JSArray 인덱스 접근 등) 사용 중.
+  # image_picker_web.dart도 Dart 3.4 API 사용 중 → 3.6으로 통일.
+  sdk: '>=3.6.0 <4.0.0'
 
 dependencies:
   flutter:
@@ -15,6 +18,10 @@ dependencies:
 
   # 네트워크 (업로드 API)
   http: ^1.2.2
+
+  # Web API (dart:html 대체 — Flutter 3.22+ / Dart 3.4+)
+  # [개발자] dart:html은 Dart 3.x에서 deprecated → package:web으로 마이그레이션됨
+  web: ^1.1.1
 
 dev_dependencies:
   flutter_test:

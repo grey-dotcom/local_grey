@@ -4,6 +4,7 @@ import 'dart:math';
 import 'dart:ui_web' as ui_web;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart'; // WidgetsBinding.instance.addPostFrameCallback
 import '../models/app_config.dart';
 import '../models/task_group.dart';
 import '../models/task_item.dart';
@@ -54,7 +55,16 @@ class CaptureProvider extends ChangeNotifier {
   bool _isContentsExpanded = false;
   bool _isCapturing = false;
   DateTime? _lastCaptureTime;
-  bool _showCaptureBubble = false;  // 촬영완료 말풍선 전용 플래그 — 소비 후 즉시 false
+  bool _showCaptureBubble = false; // 촬영완료 말풍선 전용 플래그 — 소비 후 즉시 false
+
+  // ── 촬영 완료 콜백 ──────────────────────────────────────
+  // [▶ 개발자 인수인계]
+  // 모든 필수 업무도안 촬영 완료 시 CaptureScreen이 화면을 종료하도록 트리거.
+  // 단, 마지막 도안 위치에서 촬영한 경우(최초/재촬영 무관)는 자동 pop을 발화하지 않음.
+  // → 마지막 도안에서의 종료는 항상 촬영완료 버튼(수동)으로만 처리.
+  // → 중간 도안 촬영으로 필수가 완료된 경우에만 자동 pop.
+  // CaptureScreen의 didChangeDependencies에서 등록, dispose 시 해제.
+  VoidCallback? onAllMandatoryComplete;
 
   final WebCameraService _cameraService = WebCameraService();
   CameraPermission _cameraPermission = CameraPermission.unknown;
@@ -94,6 +104,9 @@ class CaptureProvider extends ChangeNotifier {
       _groupIndex == _groups.length - 1 &&
       _itemIndex == (currentGroup?.items.length ?? 1) - 1;
 
+  /// 첫 번째 도안 여부 (순환 스와이프용)
+  bool get isFirstItem => _groupIndex == 0 && _itemIndex == 0;
+
   /// 필수 항목 전부 촬영 완료 여부 (업무완료 기준)
   bool get allMandatoryCaptured => _groups.every(
         (g) => g.mandatoryItems.every((i) => isItemCaptured(i.id)),
@@ -131,8 +144,10 @@ class CaptureProvider extends ChangeNotifier {
     return idx + _itemIndex + 1;
   }
 
-  int get mandatoryDoneCount =>
-      _groups.fold(0, (sum, g) => sum + g.mandatoryItems.where((i) => isItemCaptured(i.id)).length);
+  int get mandatoryDoneCount => _groups.fold(
+      0,
+      (sum, g) =>
+          sum + g.mandatoryItems.where((i) => isItemCaptured(i.id)).length);
 
   int get mandatoryTotalCount =>
       _groups.fold(0, (sum, g) => sum + g.mandatoryItems.length);
@@ -143,7 +158,6 @@ class CaptureProvider extends ChangeNotifier {
     _error = null;
     notifyListeners();
     try {
-      // 업무 데이터
       final raw = await rootBundle.loadString('assets/task_data.json');
       final list = json.decode(raw) as List;
       _groups = list
@@ -152,7 +166,6 @@ class CaptureProvider extends ChangeNotifier {
       _groupIndex = 0;
       _itemIndex = 0;
 
-      // 앱 설정 (지점명 등) + 매 진입 시 6자리 난수 비밀번호
       final configRaw = await rootBundle.loadString('assets/app_config.json');
       final configJson = json.decode(configRaw) as Map<String, dynamic>;
       final accessCode = (100000 + Random().nextInt(900000)).toString();
@@ -200,7 +213,6 @@ class CaptureProvider extends ChangeNotifier {
   void _navigateTo(int groupIdx, int itemIdx) {
     _groupIndex = groupIdx;
     _itemIndex = itemIdx;
-    // _isContentsExpanded 유지: 사용자 마지막 드롭다운 상태 보존 (도안 이동 시 리셋 없음)
     notifyListeners();
   }
 
@@ -210,21 +222,31 @@ class CaptureProvider extends ChangeNotifier {
     _navigateTo(groupIdx, itemIdx);
   }
 
+  // [정책] 순환 스와이프 — 마지막 도안에서 왼쪽 스와이프 → 첫 도안으로
   void goNextItemOrGroup() {
+    if (_groups.isEmpty) return;
     if (currentGroup == null) return;
     if (_itemIndex < currentGroup!.items.length - 1) {
       _navigateTo(_groupIndex, _itemIndex + 1);
     } else if (_groupIndex < _groups.length - 1) {
       _navigateTo(_groupIndex + 1, 0);
+    } else {
+      // 마지막 도안 → 첫 도안으로 순환
+      _navigateTo(0, 0);
     }
   }
 
+  // [정책] 순환 스와이프 — 첫 도안에서 오른쪽 스와이프 → 마지막 도안으로
   void goPrevItemOrGroup() {
+    if (_groups.isEmpty) return;
     if (_itemIndex > 0) {
       _navigateTo(_groupIndex, _itemIndex - 1);
     } else if (_groupIndex > 0) {
       final prevGroup = _groups[_groupIndex - 1];
       _navigateTo(_groupIndex - 1, prevGroup.items.length - 1);
+    } else {
+      // 첫 도안 → 마지막 도안으로 순환
+      _navigateTo(_groups.length - 1, _groups.last.items.length - 1);
     }
   }
 
@@ -239,8 +261,14 @@ class CaptureProvider extends ChangeNotifier {
     final group = currentGroup!;
     final capturedGroupIdx = _groupIndex;
     final capturedItemIdx = _itemIndex;
-    final wasRecapture = isItemCaptured(item.id); // 촬영 전 재촬영 여부
-    final wasAllMandatoryDone = allMandatoryCaptured; // 촬영 전 필수 완료 여부
+    final wasRecapture = isItemCaptured(item.id);
+
+    // [정책] 마지막 도안 위치에서 촬영 여부 (최초/재촬영 무관)
+    // 마지막 도안에서의 필수 완료는 자동 pop을 발화하지 않음.
+    // → 마지막 도안 종료는 항상 촬영완료 버튼(수동)으로만 처리.
+    final isLastItemCapture =
+        capturedGroupIdx == _groups.length - 1 &&
+        capturedItemIdx == (_groups.isNotEmpty ? _groups.last.items.length - 1 : 0);
 
     try {
       final bytes = await _cameraService.capture();
@@ -250,12 +278,30 @@ class CaptureProvider extends ChangeNotifier {
           CaptureResult(bytes: bytes, status: UploadStatus.uploading);
 
       _lastCaptureTime = DateTime.now();
-      _showCaptureBubble = true;  // 말풍선 트리거
-      _autoAdvance(capturedGroupIdx, capturedItemIdx,
-          wasRecapture: wasRecapture, wasAllMandatoryDone: wasAllMandatoryDone);
-      // _isCapturing은 autoAdvance 완료 후 해제 — 연타 시 중간 상태에서 재진입 방지
+      _showCaptureBubble = true;
+
+      // captures 반영 후 필수 완료 여부 체크
+      final nowAllMandatoryDone = allMandatoryCaptured;
+
+      _autoAdvance(
+        capturedGroupIdx,
+        capturedItemIdx,
+        wasRecapture: wasRecapture,
+        nowAllMandatoryDone: nowAllMandatoryDone,
+      );
+
       _isCapturing = false;
       notifyListeners();
+
+      // 모든 필수 촬영 완료 → postFrameCallback으로 build 사이클 밖에서 안전하게 pop
+      // [정책] 마지막 도안 위치에서 촬영한 경우는 자동 pop 제외 (최초/재촬영 모두).
+      //        → 마지막 도안에서는 촬영완료 버튼으로만 종료.
+      // [정책] 중간 도안 촬영으로 필수가 완료된 경우만 자동 pop.
+      if (nowAllMandatoryDone && !isLastItemCapture) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          onAllMandatoryComplete?.call();
+        });
+      }
 
       _uploadInBackground(bytes: bytes, itemId: item.id, groupId: group.id);
     } catch (e) {
@@ -266,41 +312,34 @@ class CaptureProvider extends ChangeNotifier {
     }
   }
 
-  void _autoAdvance(int capturedGroupIdx, int capturedItemIdx,
-      {required bool wasRecapture, required bool wasAllMandatoryDone}) {
-
-    // [재촬영 + 필수 완료] → 순서상 다음 도안 이동 (선택 포함), 마지막이면 루프
-    if (wasRecapture && wasAllMandatoryDone) {
-      final isLast = capturedGroupIdx == _groups.length - 1 &&
-          capturedItemIdx == _groups.last.items.length - 1;
-      if (isLast) {
-        _groupIndex = 0;
-        _itemIndex = 0;
-      } else if (capturedItemIdx < _groups[capturedGroupIdx].items.length - 1) {
-        _groupIndex = capturedGroupIdx;
-        _itemIndex = capturedItemIdx + 1;
-      } else {
-        _groupIndex = capturedGroupIdx + 1;
-        _itemIndex = 0;
-      }
+  // ── autoAdvance ───────────────────────────────────────────────────────────
+  // Case 1 [촬영 후 필수 전체 완료]  → 마지막 도안 유지 (자동 pop은 capture()에서 별도 판단)
+  // Case 2 [재촬영 + 필수 미완료]    → 촬영 즉시 첫 미촬영 필수 도안으로 이동
+  // Case 3 [일반 촬영 + 필수 미완료] → capturedIdx 이후 순방향 탐색 → wrap-around
+  void _autoAdvance(
+    int capturedGroupIdx,
+    int capturedItemIdx, {
+    required bool wasRecapture,
+    required bool nowAllMandatoryDone,
+  }) {
+    // Case 1
+    if (nowAllMandatoryDone) {
+      _groupIndex = _groups.length - 1;
+      _itemIndex = _groups.last.items.length - 1;
       return;
     }
 
-    // [재촬영 + 필수 미완료] → 첫 미촬영 필수 도안으로 이동
-    if (wasRecapture && !wasAllMandatoryDone) {
-      for (int g = 0; g < _groups.length; g++) {
-        for (final item in _groups[g].mandatoryItems) {
-          if (!isItemCaptured(item.id)) {
-            _groupIndex = g;
-            _itemIndex = _groups[g].items.indexOf(item);
-            return;
-          }
-        }
+    // Case 2
+    if (wasRecapture && !nowAllMandatoryDone) {
+      final target = firstUncapturedMandatory;
+      if (target != null) {
+        _groupIndex = target.groupIdx;
+        _itemIndex = target.itemIdx;
+        return;
       }
-      // (fallthrough → 다음 미촬영 도안 탐색)
     }
 
-    // [일반 촬영] → 다음 미촬영 도안 (촬영된 건 건너뜀)
+    // Case 3 — 순방향 탐색
     for (int g = capturedGroupIdx; g < _groups.length; g++) {
       final startI = (g == capturedGroupIdx) ? capturedItemIdx + 1 : 0;
       for (int i = startI; i < _groups[g].items.length; i++) {
@@ -311,7 +350,21 @@ class CaptureProvider extends ChangeNotifier {
         }
       }
     }
-    // 전체 완료 → 마지막 도안 유지 (업무완료 버튼 노출)
+
+    // Case 3 — wrap-around: 처음부터 capturedIdx 직전까지
+    for (int g = 0; g <= capturedGroupIdx; g++) {
+      final endI =
+          (g == capturedGroupIdx) ? capturedItemIdx : _groups[g].items.length;
+      for (int i = 0; i < endI; i++) {
+        if (!isItemCaptured(_groups[g].items[i].id)) {
+          _groupIndex = g;
+          _itemIndex = i;
+          return;
+        }
+      }
+    }
+
+    // fallthrough: 선택 도안만 남은 상태 → 마지막 도안 유지
     _groupIndex = _groups.length - 1;
     _itemIndex = _groups.last.items.length - 1;
   }
@@ -349,11 +402,9 @@ class CaptureProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 말풍선을 한 번 노출한 후 호출 — 플래그를 소비해서 중복 노출 차단
   void consumeCaptureBubble() {
     if (_showCaptureBubble) {
       _showCaptureBubble = false;
-      // notifyListeners 호출 불필요 — 이미 말풍선이 리스너에서 애니메이션을 시작한 후 소비됨
     }
   }
 
@@ -364,6 +415,7 @@ class CaptureProvider extends ChangeNotifier {
 
   @override
   void dispose() {
+    onAllMandatoryComplete = null;
     _cameraService.stop();
     super.dispose();
   }

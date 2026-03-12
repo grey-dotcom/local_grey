@@ -21,8 +21,33 @@ const double _sideInset      =  24.0;
 // ══════════════════════════════════════════════════════════
 // 촬영 화면
 // ══════════════════════════════════════════════════════════
-class CaptureScreen extends StatelessWidget {
+class CaptureScreen extends StatefulWidget {
   const CaptureScreen({super.key});
+
+  @override
+  State<CaptureScreen> createState() => _CaptureScreenState();
+}
+
+class _CaptureScreenState extends State<CaptureScreen> {
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // 모든 필수 촬영 완료 콜백 등록.
+    // 중간 도안 촬영으로 필수가 완료된 경우에만 발화.
+    // (마지막 도안 위치에서의 완료는 capture_provider에서 자동 pop 제외 처리)
+    final provider = context.read<CaptureProvider>();
+    provider.onAllMandatoryComplete = () {
+      if (mounted) Navigator.of(context).pop(true);
+    };
+  }
+
+  @override
+  void dispose() {
+    // 화면 종료 시 콜백 해제 — 메모리 누수 및 해제된 context 참조 방지
+    final provider = context.read<CaptureProvider>();
+    provider.onAllMandatoryComplete = null;
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -74,6 +99,9 @@ class CaptureScreen extends StatelessWidget {
                     bottom: _shutterBottom, left: 0, right: 0,
                     child: Center(child: ShutterButton(provider: provider)),
                   ),
+                  // 촬영 완료 버튼: 마지막 도안일 때만 표시
+                  // - active(필수 전체 완료): 탭 시 화면 종료
+                  // - inactive: 탭 시 첫 미촬영 필수 도안으로 이동
                   if (provider.isLastItem)
                     Positioned(
                       bottom: _completeBottom, right: _sideInset,
@@ -323,6 +351,8 @@ class _UploadIndicator extends StatelessWidget {
 
 // ══════════════════════════════════════════════════════════
 // 스와이프 화살표
+// [정책] 순환 스와이프: 첫 도안 ↔ 마지막 도안 양방향 순환.
+//        화살표는 항상 표시 (끝 도안에서도 반대편 끝으로 이동 가능).
 // ══════════════════════════════════════════════════════════
 class _SwipeArrows extends StatelessWidget {
   const _SwipeArrows();
@@ -330,30 +360,15 @@ class _SwipeArrows extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<CaptureProvider>();
-    final hasPrev = provider.itemIndex > 0 || provider.groupIndex > 0;
-    final hasNext = provider.itemIndex < provider.currentItems.length - 1 ||
-        provider.groupIndex < provider.groups.length - 1;
 
     return Stack(children: [
       Positioned(
         top: 0, bottom: 0, left: 0, width: 64,
-        child: Opacity(
-          opacity: hasPrev ? 1.0 : 0.0,
-          child: IgnorePointer(
-            ignoring: !hasPrev,
-            child: _ArrowButton(icon: Icons.chevron_left, onTap: provider.goPrevItemOrGroup),
-          ),
-        ),
+        child: _ArrowButton(icon: Icons.chevron_left, onTap: provider.goPrevItemOrGroup),
       ),
       Positioned(
         top: 0, bottom: 0, right: 0, width: 64,
-        child: Opacity(
-          opacity: hasNext ? 1.0 : 0.0,
-          child: IgnorePointer(
-            ignoring: !hasNext,
-            child: _ArrowButton(icon: Icons.chevron_right, onTap: provider.goNextItemOrGroup),
-          ),
-        ),
+        child: _ArrowButton(icon: Icons.chevron_right, onTap: provider.goNextItemOrGroup),
       ),
     ]);
   }
@@ -399,17 +414,31 @@ class _SwipeDetectorState extends State<_SwipeDetector> {
   Widget build(BuildContext context) {
     return GestureDetector(
       behavior: HitTestBehavior.translucent,
-      onHorizontalDragStart: (d) { _startX = d.localPosition.dx; _committed = false; },
+      onHorizontalDragStart: (d) {
+        _startX = d.localPosition.dx;
+        _committed = false;
+      },
       onHorizontalDragUpdate: (d) {
         if (_startX == null || _committed) return;
         final dx = d.localPosition.dx - _startX!;
         if (dx.abs() >= _threshold) {
           _committed = true;
-          if (dx < 0) widget.onSwipeLeft(); else widget.onSwipeRight();
+          // [버그 수정 노트] if/else 중괄호 추가 (curly_braces_in_flow_control_structures)
+          if (dx < 0) {
+            widget.onSwipeLeft();
+          } else {
+            widget.onSwipeRight();
+          }
         }
       },
-      onHorizontalDragEnd: (_) { _startX = null; _committed = false; },
-      onHorizontalDragCancel: () { _startX = null; _committed = false; },
+      onHorizontalDragEnd: (_) {
+        _startX = null;
+        _committed = false;
+      },
+      onHorizontalDragCancel: () {
+        _startX = null;
+        _committed = false;
+      },
       child: widget.child,
     );
   }
