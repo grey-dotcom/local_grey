@@ -10,13 +10,11 @@ import '../widgets/task_list_modal.dart';
 const _font = 'Spoqa Han Sans Neo';
 
 // ── 레이아웃 상수 (390px 기준) ──
-const double _shutterBottom  =  80.0;
-const double _thumbBottom    =  96.0;
-const double _thumbSize      =  52.0;
-const double _shutterRadius  =  42.0;
-const double _thumbGap       =  50.0;
-const double _completeBottom =  28.0;
-const double _sideInset      =  24.0;
+const double _shutterBottom = 80.0;
+const double _thumbBottom   = 96.0;
+const double _thumbSize     = 52.0;
+const double _shutterRadius = 42.0;
+const double _thumbGap      = 50.0;
 
 // ══════════════════════════════════════════════════════════
 // 촬영 화면
@@ -33,8 +31,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     // 모든 필수 촬영 완료 콜백 등록.
-    // 중간 도안 촬영으로 필수가 완료된 경우에만 발화.
-    // (마지막 도안 위치에서의 완료는 capture_provider에서 자동 pop 제외 처리)
+    // 촬영완료 버튼 제거로 모든 케이스 자동 pop으로 통합.
     final provider = context.read<CaptureProvider>();
     provider.onAllMandatoryComplete = () {
       if (mounted) Navigator.of(context).pop(true);
@@ -64,12 +61,14 @@ class _CaptureScreenState extends State<CaptureScreen> {
         }
         return Scaffold(
           backgroundColor: Colors.black,
-          body: _SwipeDetector(
-            onSwipeLeft: provider.goNextItemOrGroup,
-            onSwipeRight: provider.goPrevItemOrGroup,
-            child: Column(children: [
-              _TopArea(onListTap: () => _showTaskModal(context, provider)),
-              Expanded(
+          // [정책] _SwipeDetector를 카메라 영역(Expanded)으로 축소.
+          // 상단 GuideCard의 캐러셀 가로 스크롤과 충돌 방지.
+          body: Column(children: [
+            _TopArea(onListTap: () => _showTaskModal(context, provider)),
+            Expanded(
+              child: _SwipeDetector(
+                onSwipeLeft: provider.goNextItemOrGroup,
+                onSwipeRight: provider.goPrevItemOrGroup,
                 child: Stack(children: [
                   const Positioned.fill(child: _LiveCamera()),
                   Positioned.fill(
@@ -99,18 +98,12 @@ class _CaptureScreenState extends State<CaptureScreen> {
                     bottom: _shutterBottom, left: 0, right: 0,
                     child: Center(child: ShutterButton(provider: provider)),
                   ),
-                  // 촬영 완료 버튼: 마지막 도안일 때만 표시
-                  // - active(필수 전체 완료): 탭 시 화면 종료
-                  // - inactive: 탭 시 첫 미촬영 필수 도안으로 이동
-                  if (provider.isLastItem)
-                    Positioned(
-                      bottom: _completeBottom, right: _sideInset,
-                      child: CaptureCompleteButton(provider: provider),
-                    ),
+                  // [정책] 촬영완료 버튼 제거.
+                  // 모든 필수 촬영 완료 시 capture_provider에서 자동 pop.
                 ]),
               ),
-            ]),
-          ),
+            ),
+          ]),
         );
       },
     );
@@ -270,7 +263,6 @@ class _BackButton extends StatelessWidget {
       if (context.mounted) Navigator.of(context).maybePop();
       return;
     }
-    ...
     */
     // [미촬영 검증 주석끝] 어떤 상태든 바로 나가기
     if (context.mounted) Navigator.of(context).maybePop();
@@ -300,6 +292,7 @@ class _GroupDots extends StatelessWidget {
 
 // ══════════════════════════════════════════════════════════
 // 힌트 Pill
+// [UX Writing] "스와이프" → 고령 사용자 고려, 직관적 표현으로 개선
 // ══════════════════════════════════════════════════════════
 class _HintPill extends StatelessWidget {
   @override
@@ -307,7 +300,7 @@ class _HintPill extends StatelessWidget {
     final provider = context.watch<CaptureProvider>();
     final hint = provider.isRecaptureMode
         ? '저장된 사진이 있어요. 다시 촬영하려면 재촬영 버튼을 선택하세요.'
-        : '스와이프하면 다음 업무 촬영이 가능해요';
+        : '좌우로 밀거나 화살표를 눌러 이동할 수 있어요';
     return Center(
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 24),
@@ -392,7 +385,9 @@ class _ArrowButton extends StatelessWidget {
 }
 
 // ══════════════════════════════════════════════════════════
-// 스와이프 감지
+// 스와이프 감지 — 카메라 영역 전용
+// [정책] GuideCard 캐러셀 가로 스크롤과 충돌하지 않도록
+//        Expanded(카메라 영역)에만 적용.
 // ══════════════════════════════════════════════════════════
 class _SwipeDetector extends StatefulWidget {
   final Widget child;
@@ -423,7 +418,6 @@ class _SwipeDetectorState extends State<_SwipeDetector> {
         final dx = d.localPosition.dx - _startX!;
         if (dx.abs() >= _threshold) {
           _committed = true;
-          // [버그 수정 노트] if/else 중괄호 추가 (curly_braces_in_flow_control_structures)
           if (dx < 0) {
             widget.onSwipeLeft();
           } else {

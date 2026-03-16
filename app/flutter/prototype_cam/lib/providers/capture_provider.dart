@@ -60,9 +60,7 @@ class CaptureProvider extends ChangeNotifier {
   // ── 촬영 완료 콜백 ──────────────────────────────────────
   // [▶ 개발자 인수인계]
   // 모든 필수 업무도안 촬영 완료 시 CaptureScreen이 화면을 종료하도록 트리거.
-  // 단, 마지막 도안 위치에서 촬영한 경우(최초/재촬영 무관)는 자동 pop을 발화하지 않음.
-  // → 마지막 도안에서의 종료는 항상 촬영완료 버튼(수동)으로만 처리.
-  // → 중간 도안 촬영으로 필수가 완료된 경우에만 자동 pop.
+  // 촬영완료 버튼 제거 이후 모든 케이스에서 nowAllMandatoryDone이면 자동 pop으로 통합.
   // CaptureScreen의 didChangeDependencies에서 등록, dispose 시 해제.
   VoidCallback? onAllMandatoryComplete;
 
@@ -231,7 +229,6 @@ class CaptureProvider extends ChangeNotifier {
     } else if (_groupIndex < _groups.length - 1) {
       _navigateTo(_groupIndex + 1, 0);
     } else {
-      // 마지막 도안 → 첫 도안으로 순환
       _navigateTo(0, 0);
     }
   }
@@ -245,7 +242,6 @@ class CaptureProvider extends ChangeNotifier {
       final prevGroup = _groups[_groupIndex - 1];
       _navigateTo(_groupIndex - 1, prevGroup.items.length - 1);
     } else {
-      // 첫 도안 → 마지막 도안으로 순환
       _navigateTo(_groups.length - 1, _groups.last.items.length - 1);
     }
   }
@@ -262,13 +258,6 @@ class CaptureProvider extends ChangeNotifier {
     final capturedGroupIdx = _groupIndex;
     final capturedItemIdx = _itemIndex;
     final wasRecapture = isItemCaptured(item.id);
-
-    // [정책] 마지막 도안 위치에서 촬영 여부 (최초/재촬영 무관)
-    // 마지막 도안에서의 필수 완료는 자동 pop을 발화하지 않음.
-    // → 마지막 도안 종료는 항상 촬영완료 버튼(수동)으로만 처리.
-    final isLastItemCapture =
-        capturedGroupIdx == _groups.length - 1 &&
-        capturedItemIdx == (_groups.isNotEmpty ? _groups.last.items.length - 1 : 0);
 
     try {
       final bytes = await _cameraService.capture();
@@ -293,11 +282,11 @@ class CaptureProvider extends ChangeNotifier {
       _isCapturing = false;
       notifyListeners();
 
-      // 모든 필수 촬영 완료 → postFrameCallback으로 build 사이클 밖에서 안전하게 pop
-      // [정책] 마지막 도안 위치에서 촬영한 경우는 자동 pop 제외 (최초/재촬영 모두).
-      //        → 마지막 도안에서는 촬영완료 버튼으로만 종료.
-      // [정책] 중간 도안 촬영으로 필수가 완료된 경우만 자동 pop.
-      if (nowAllMandatoryDone && !isLastItemCapture) {
+      // [정책] 모든 필수 촬영 완료 시 위치 무관하게 자동 pop.
+      // 촬영완료 버튼 제거로 모든 종료 경로를 자동 pop으로 통합.
+      // Case 1 (처음부터 순서대로), Case 2 (재촬영 후 완료),
+      // Case 3 (중간부터 촬영 후 완료) 모두 동일하게 처리.
+      if (nowAllMandatoryDone) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           onAllMandatoryComplete?.call();
         });
@@ -313,7 +302,7 @@ class CaptureProvider extends ChangeNotifier {
   }
 
   // ── autoAdvance ───────────────────────────────────────────────────────────
-  // Case 1 [촬영 후 필수 전체 완료]  → 마지막 도안 유지 (자동 pop은 capture()에서 별도 판단)
+  // Case 1 [촬영 후 필수 전체 완료]  → 마지막 도안 유지 후 자동 pop (capture()에서 발화)
   // Case 2 [재촬영 + 필수 미완료]    → 촬영 즉시 첫 미촬영 필수 도안으로 이동
   // Case 3 [일반 촬영 + 필수 미완료] → capturedIdx 이후 순방향 탐색 → wrap-around
   void _autoAdvance(
@@ -322,14 +311,14 @@ class CaptureProvider extends ChangeNotifier {
     required bool wasRecapture,
     required bool nowAllMandatoryDone,
   }) {
-    // Case 1
+    // Case 1 — 필수 완료: 마지막 도안 유지 (pop은 capture()에서 처리)
     if (nowAllMandatoryDone) {
       _groupIndex = _groups.length - 1;
       _itemIndex = _groups.last.items.length - 1;
       return;
     }
 
-    // Case 2
+    // Case 2 — 재촬영 + 필수 미완료: 첫 미촬영 필수 도안으로 이동
     if (wasRecapture && !nowAllMandatoryDone) {
       final target = firstUncapturedMandatory;
       if (target != null) {

@@ -33,8 +33,6 @@ class _CaptureDoneBubbleState extends State<CaptureDoneBubble>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // showCaptureBubble 플래그가 true이면 말풍선을 띄우고 즉시 소비.
-    // build() 안에서 처리하지 않으므로 재진입/초기화 타이밍 문제 없음.
     final provider = context.read<CaptureProvider>();
     if (provider.showCaptureBubble) {
       provider.consumeCaptureBubble();
@@ -72,7 +70,6 @@ class _CaptureDoneBubbleState extends State<CaptureDoneBubble>
 
   @override
   Widget build(BuildContext context) {
-    // Provider 변경 시 didChangeDependencies가 호출되도록 구독 유지
     context.watch<CaptureProvider>();
     return Positioned(
       left: 0, right: 0, bottom: 172,
@@ -200,56 +197,9 @@ class ShutterButton extends StatelessWidget {
 }
 
 // ══════════════════════════════════════════════════════════
-// 촬영완료 버튼
-// active: 필수 완료 시 화면 종료 / inactive: 첫 미촬영 필수 도안으로 이동
+// [정책] CaptureCompleteButton 제거.
+// 모든 필수 촬영 완료 시 capture_provider의 onAllMandatoryComplete로 자동 pop.
 // ══════════════════════════════════════════════════════════
-class CaptureCompleteButton extends StatelessWidget {
-  final CaptureProvider provider;
-  const CaptureCompleteButton({super.key, required this.provider});
-
-  @override
-  Widget build(BuildContext context) {
-    final isActive = provider.allMandatoryCaptured;
-    final bgColor = isActive
-        ? const Color(0xFF3B82F6)
-        : const Color(0xFF94A3B8).withAlpha(128);
-
-    return GestureDetector(
-      onTap: () => _handleComplete(context),
-      behavior: HitTestBehavior.opaque,
-      child: Container(
-        padding: const EdgeInsets.only(left: 12, right: 8, top: 8, bottom: 8),
-        decoration: BoxDecoration(
-          color: bgColor,
-          borderRadius: BorderRadius.circular(24),
-          boxShadow: isActive
-              ? [
-                  BoxShadow(color: Colors.black.withAlpha(26), blurRadius: 6, spreadRadius: -4, offset: const Offset(0, 4)),
-                  BoxShadow(color: Colors.black.withAlpha(26), blurRadius: 15, spreadRadius: -3, offset: const Offset(0, 10)),
-                ]
-              : [],
-        ),
-        child: const Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('촬영 완료', style: TextStyle(fontFamily: _font, color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700)),
-            SizedBox(width: 4),
-            Icon(Icons.check_rounded, color: Colors.white, size: 16),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _handleComplete(BuildContext context) async {
-    if (!provider.allMandatoryCaptured) {
-      final target = provider.firstUncapturedMandatory;
-      if (target != null) provider.jumpToItem(target.groupIdx, target.itemIdx);
-      return;
-    }
-    if (context.mounted) Navigator.of(context).maybePop();
-  }
-}
 
 // ══════════════════════════════════════════════════════════
 // 촬영 화면 썸네일 (좌하단 미리보기)
