@@ -8,6 +8,18 @@ import '../screens/report_screen.dart';
 
 const _font = 'S-Core Dream';
 
+// ── [디버깅] _decodeBytes 중복 제거 ──────────────────────────
+// ReportPhotoRow와 ReportFullScreenViewer에서 동일 로직 중복 정의되어 있었음.
+// top-level 함수로 추출하여 단일 위치에서 관리.
+Uint8List? _decodeBytes(String dataUrl) {
+  try {
+    final b64 = dataUrl.contains(',') ? dataUrl.split(',').last : dataUrl;
+    return base64Decode(b64);
+  } catch (_) {
+    return null;
+  }
+}
+
 // ══════════════════════════════════════════════════════════
 // 등록한 보고사항 섹션 (항목 없으면 자동 숨김)
 // ══════════════════════════════════════════════════════════
@@ -53,7 +65,6 @@ class ReportEntryCard extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 24, 16, 24),
       decoration: BoxDecoration(color: const Color(0xFFF5F5F5), borderRadius: BorderRadius.circular(16)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        // ── 헤더: 보고 유형명 + 수정/삭제 버튼
         Row(children: [
           Expanded(
             child: Text(entry.typeLabel,
@@ -76,12 +87,10 @@ class ReportEntryCard extends StatelessWidget {
         const SizedBox(height: 12),
         const Divider(height: 1, thickness: 1, color: Color(0xFFD9D9D9)),
         const SizedBox(height: 12),
-        // ── 사진 썸네일 (탭하면 전체화면)
         if (entry.photoDataUrls.isNotEmpty) ...[
           ReportPhotoRow(photoDataUrls: entry.photoDataUrls),
           const SizedBox(height: 12),
         ],
-        // ── 내용 텍스트 박스
         Container(
           width: double.infinity,
           padding: const EdgeInsets.all(16),
@@ -130,7 +139,7 @@ class ReportEntryCard extends StatelessWidget {
 }
 
 // ══════════════════════════════════════════════════════════
-// 보고사항 카드 내 사진 행 — 썸네일 탭 → 전체화면 뷰어
+// 사진 행 — 썸네일 탭 → 전체화면 뷰어
 // ══════════════════════════════════════════════════════════
 class ReportPhotoRow extends StatelessWidget {
   final List<String> photoDataUrls;
@@ -142,7 +151,7 @@ class ReportPhotoRow extends StatelessWidget {
     return Wrap(
       spacing: 8, runSpacing: 8,
       children: photoDataUrls.asMap().entries.map((e) {
-        final bytes = _decodeBytes(e.value);
+        final bytes = _decodeBytes(e.value); // top-level 함수 사용
         return GestureDetector(
           onTap: () => _showFullScreen(context, e.key),
           child: ClipRRect(
@@ -171,15 +180,6 @@ class ReportPhotoRow extends StatelessWidget {
         mq: mq,
       ),
     );
-  }
-
-  static Uint8List? _decodeBytes(String dataUrl) {
-    try {
-      final b64 = dataUrl.contains(',') ? dataUrl.split(',').last : dataUrl;
-      return base64Decode(b64);
-    } catch (_) {
-      return null;
-    }
   }
 }
 
@@ -218,15 +218,6 @@ class _ReportFullScreenViewerState extends State<ReportFullScreenViewer> {
     super.dispose();
   }
 
-  static Uint8List? _decodeBytes(String dataUrl) {
-    try {
-      final b64 = dataUrl.contains(',') ? dataUrl.split(',').last : dataUrl;
-      return base64Decode(b64);
-    } catch (_) {
-      return null;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final mq = widget.mq;
@@ -242,7 +233,7 @@ class _ReportFullScreenViewerState extends State<ReportFullScreenViewer> {
             itemCount: widget.photoDataUrls.length,
             onPageChanged: (i) => setState(() => _currentIndex = i),
             itemBuilder: (_, i) {
-              final bytes = _decodeBytes(widget.photoDataUrls[i]);
+              final bytes = _decodeBytes(widget.photoDataUrls[i]); // top-level 함수 사용
               return InteractiveViewer(
                 minScale: 0.8, maxScale: 5.0,
                 child: Center(

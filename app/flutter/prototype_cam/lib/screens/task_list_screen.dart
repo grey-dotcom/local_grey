@@ -1,35 +1,34 @@
 // =============================================================================
 // [프로토타입 화면] 첫 화면 — 등록하기 (업무 도안 목록 + 보고사항)
 //
-// ▶ 이 파일은 현재 서비스 UX를 Web 브라우저에서 재현하기 위한 프로토타입입니다.
-//   실제 앱 개발의 시작점은 "사진추가" 버튼 탭 → CaptureScreen 진입입니다.
+// ▶ Phase 3 변경 내용:
+//   - [보고사항 등록] 버튼 제거
+//   - 하단 버튼 3단계 전환:
+//       필수 미촬영        → [등록 완료] disabled
+//       촬영완료+업로드중   → [수행완료] → [등록 완료 - 업로드중] disabled
+//       촬영완료+업로드완료 → [수행완료] → 즉시 등록완료
 //
-// ▶ 개발자 인수인계 참고 사항:
-//   - "사진추가" 셀 탭 → CaptureScreen.dart (사진 촬영 메인 플로우)
-//   - "보고사항 등록" 버튼 → ReportScreen.dart
-//   - 업무 데이터: assets/task_data.json (CaptureProvider가 로드)
-//   - 앱 설정(지점명 등): assets/app_config.json
-//   - 보고사항 상태: ReportProvider (메모리 한정, 영구 저장 없음)
+// ▶ [디버깅] _BottomCta StatelessWidget → StatefulWidget 전환
+//   기존: build() 내 addPostFrameCallback → 리빌드마다 콜백 중복 스케줄 위험
+//   수정: _completeTriggered 플래그로 단 1회만 _doComplete 호출 보장
+//
+// ▶ [BE 연동 #4] 수행완료 API
+//   실서버 연동 시 _doComplete 내 주석 해제 후 구현
 // =============================================================================
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/capture_provider.dart';
 import '../models/task_group.dart';
-import 'report_screen.dart';
 import '../widgets/task_card.dart';
 import '../widgets/report_entry_card.dart';
 
-// ── 디자인 토큰 ──────────────────────────────────────────
-const _font         = 'S-Core Dream';
-const _bgPage       = Color(0xFFE9EAEF);
-const _tabActive    = Color(0xFF10A67B);
-const _tabInactive  = Color(0xFF9F9F9F);
-const _mandatory    = Color(0xFFDE321C);
-const _btnFill      = Color(0xFF2751E0);
-const _btnOutline   = Color(0xFF6280E8);
-const _btnOutlineBg = Color(0xFFF3F6FF);
-const _btnOutlineFg = Color(0xFF122979);
+const _font        = 'S-Core Dream';
+const _bgPage      = Color(0xFFE9EAEF);
+const _tabActive   = Color(0xFF10A67B);
+const _tabInactive = Color(0xFF9F9F9F);
+const _mandatory   = Color(0xFFDE321C);
+const _btnFill     = Color(0xFF2751E0);
 
 // ══════════════════════════════════════════════════════════
 // 최상위 화면
@@ -64,7 +63,7 @@ class TaskListScreen extends StatelessWidget {
 }
 
 // ══════════════════════════════════════════════════════════
-// 상단 헤더 — 지점명 + 탭
+// 상단 헤더
 // ══════════════════════════════════════════════════════════
 class _TopHeader extends StatelessWidget {
   @override
@@ -191,10 +190,7 @@ class _GuideBanner extends StatelessWidget {
                 child: Stack(alignment: Alignment.center, children: [
                   Container(
                     width: 48, height: 48,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF6ED3B3).withAlpha(30),
-                      shape: BoxShape.circle,
-                    ),
+                    decoration: BoxDecoration(color: const Color(0xFF6ED3B3).withAlpha(30), shape: BoxShape.circle),
                   ),
                   const Icon(Icons.vibration, size: 28, color: Color(0xFF6ED3B3)),
                 ]),
@@ -258,15 +254,89 @@ class _GroupSection extends StatelessWidget {
 }
 
 // ══════════════════════════════════════════════════════════
-// 하단 CTA 버튼 영역
+// 하단 CTA — StatefulWidget
+//
+// [디버깅 수정] StatelessWidget → StatefulWidget 전환
+//   _completeTriggered 플래그로 자동 등록완료가 단 1회만 호출되도록 보장.
+//   기존 StatelessWidget에서는 build() 내 addPostFrameCallback이
+//   provider 상태 변경마다 반복 스케줄될 수 있는 무한루프 위험이 있었음.
 // ══════════════════════════════════════════════════════════
-class _BottomCta extends StatelessWidget {
+class _BottomCta extends StatefulWidget {
   final CaptureProvider provider;
   const _BottomCta({required this.provider});
 
   @override
+  State<_BottomCta> createState() => _BottomCtaState();
+}
+
+class _BottomCtaState extends State<_BottomCta> {
+  // 자동 등록완료 처리 중복 방지 플래그
+  bool _completeTriggered = false;
+
+  @override
   Widget build(BuildContext context) {
-    final isActive = provider.allMandatoryCaptured;
+    final provider    = widget.provider;
+    final allCaptured = provider.allMandatoryCaptured;
+    final isUploading = provider.hasMandatoryUploading;
+    final hasError    = provider.hasMandatoryError;
+    final allUploaded = provider.allMandatoryUploadSuccess;
+    final requested   = provider.completeRequested;
+
+    // [BE 연동 #4] completeRequested=true + 업로드 완료 → 자동 등록완료 (1회 보장)
+    if (requested && allUploaded && !_completeTriggered) {
+      _completeTriggered = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _doComplete(context);
+      });
+    }
+    // 상태가 초기화되면 플래그도 초기화
+    if (!requested) _completeTriggered = false;
+
+    // 상태 ①: 필수 미촬영
+    if (!allCaptured) {
+      return _buildCta(
+        context,
+        guideText: '*모든 필수 업무 도안(*표시) 촬영 후 수행완료가 가능합니다.',
+        btnText: '등록 완료',
+        btnColor: const Color(0xFFCCCCCC),
+        enabled: false,
+        onTap: () => _showNotReadyDialog(context),
+      );
+    }
+
+    // 상태 ②: 수행완료 요청됨 + 업로드 진행 중
+    if (requested && (isUploading || hasError)) {
+      return _buildCta(
+        context,
+        guideText: '사진 업로드가 완료되면 자동으로 수행완료 처리됩니다.',
+        btnText: '등록 완료 - 업로드중',
+        btnColor: const Color(0xFFCCCCCC),
+        enabled: false,
+        onTap: null,
+        showUploadIndicator: true,
+      );
+    }
+
+    // 상태 ③: 수행완료 가능
+    return _buildCta(
+      context,
+      guideText: '*수행완료 선택 시 사진 업로드가 끝나면 자동 완료 처리됩니다.',
+      btnText: '수행완료',
+      btnColor: _btnFill,
+      enabled: true,
+      onTap: () => _onPerformComplete(context),
+    );
+  }
+
+  Widget _buildCta(
+    BuildContext context, {
+    required String guideText,
+    required String btnText,
+    required Color btnColor,
+    required bool enabled,
+    required VoidCallback? onTap,
+    bool showUploadIndicator = false,
+  }) {
     return Container(
       decoration: const BoxDecoration(
         color: Colors.white,
@@ -274,81 +344,91 @@ class _BottomCta extends StatelessWidget {
       ),
       padding: EdgeInsets.fromLTRB(16, 16, 16, MediaQuery.of(context).padding.bottom + 16),
       child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Padding(
-          padding: EdgeInsets.only(bottom: 8),
-          child: Text('*등록 완료 버튼 클릭 후 사진 업로드가 끝나면 수행이 자동 완료 처리됩니다.',
-              style: TextStyle(fontFamily: _font, color: Color(0xFF9F9F9F), fontSize: 12, fontWeight: FontWeight.w200, height: 14 / 12)),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Row(children: [
+            if (showUploadIndicator) ...[
+              const SizedBox(
+                width: 10, height: 10,
+                child: CircularProgressIndicator(color: Color(0xFF94A3B8), strokeWidth: 1.5),
+              ),
+              const SizedBox(width: 6),
+            ],
+            Expanded(
+              child: Text(guideText,
+                  style: const TextStyle(fontFamily: _font, color: Color(0xFF9F9F9F), fontSize: 12, fontWeight: FontWeight.w200, height: 14 / 12)),
+            ),
+          ]),
         ),
-        Row(children: [
-          Expanded(
-            child: SizedBox(
-              height: 40,
-              child: OutlinedButton(
-                onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ReportScreen())),
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: _btnOutline),
-                  backgroundColor: _btnOutlineBg,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                ),
-                child: const Text('보고사항 등록',
-                    style: TextStyle(fontFamily: _font, color: _btnOutlineFg, fontSize: 14, fontWeight: FontWeight.w700, height: 22 / 14)),
-              ),
+        SizedBox(
+          width: double.infinity,
+          height: 48,
+          child: FilledButton(
+            onPressed: enabled ? onTap : null,
+            style: FilledButton.styleFrom(
+              backgroundColor: btnColor,
+              disabledBackgroundColor: const Color(0xFFCCCCCC),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
+            child: Text(btnText,
+                style: const TextStyle(fontFamily: _font, color: Colors.white, fontSize: 15, fontWeight: FontWeight.w700, height: 22 / 15)),
           ),
-          const SizedBox(width: 8),
-          SizedBox(
-            width: 160, height: 40,
-            child: FilledButton(
-              onPressed: () => _onComplete(context, isActive),
-              style: FilledButton.styleFrom(
-                backgroundColor: isActive ? _btnFill : const Color(0xFFCCCCCC),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              ),
-              child: const Text('등록 완료',
-                  style: TextStyle(fontFamily: _font, color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700, height: 22 / 14)),
-            ),
-          ),
-        ]),
+        ),
       ]),
     );
   }
 
-  void _onComplete(BuildContext context, bool isActive) {
-    if (isActive) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('등록이 완료되었습니다.', style: TextStyle(fontFamily: _font)),
-        backgroundColor: Color(0xFF22C55E), duration: Duration(seconds: 2),
-      ));
+  void _onPerformComplete(BuildContext context) {
+    if (widget.provider.allMandatoryUploadSuccess) {
+      _doComplete(context);
     } else {
-      showDialog(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Text('필수 업무 도안 촬영을 완료해 주세요',
-              style: TextStyle(fontFamily: _font, fontSize: 16, fontWeight: FontWeight.w700, color: Colors.black)),
-          content: const Text(
-            '모든 필수 업무 도안(*표시) 촬영이 완료되어야\n등록 완료가 가능합니다.\n\n미촬영 필수 항목을 확인 후\n촬영을 완료해 주세요.',
-            style: TextStyle(fontFamily: _font, fontSize: 14, color: Color(0xFF555555), height: 1.6),
-          ),
-          actionsAlignment: MainAxisAlignment.center,
-          actions: [
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                onPressed: () => Navigator.pop(ctx),
-                style: FilledButton.styleFrom(
-                  backgroundColor: _btnFill,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                ),
-                child: const Text('확인',
-                    style: TextStyle(fontFamily: _font, fontWeight: FontWeight.w700, fontSize: 15, color: Colors.white)),
-              ),
-            ),
-          ],
-        ),
-      );
+      widget.provider.setCompleteRequested(true);
+      // [BE 연동 #4] 업로드 완료 시 build()에서 자동 감지 → _doComplete 호출
     }
+  }
+
+  void _doComplete(BuildContext context) {
+    if (widget.provider.completeRequested) {
+      widget.provider.setCompleteRequested(false);
+    }
+    // [BE 연동 #4] POST /api/v1/tasks/{taskId}/complete 호출 지점
+    // await _api.completeTask(taskId: widget.provider.appConfig?.taskId);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+      content: Text('수행이 완료되었습니다.', style: TextStyle(fontFamily: _font)),
+      backgroundColor: Color(0xFF22C55E),
+      duration: Duration(seconds: 2),
+    ));
+  }
+
+  void _showNotReadyDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('필수 업무 도안 촬영을 완료해 주세요',
+            style: TextStyle(fontFamily: _font, fontSize: 16, fontWeight: FontWeight.w700, color: Colors.black)),
+        content: const Text(
+          '모든 필수 업무 도안(*표시) 촬영이 완료되어야\n수행완료가 가능합니다.\n\n미촬영 필수 항목을 확인 후\n촬영을 완료해 주세요.',
+          style: TextStyle(fontFamily: _font, fontSize: 14, color: Color(0xFF555555), height: 1.6),
+        ),
+        actionsAlignment: MainAxisAlignment.center,
+        actions: [
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: () => Navigator.pop(ctx),
+              style: FilledButton.styleFrom(
+                backgroundColor: _btnFill,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+              child: const Text('확인',
+                  style: TextStyle(fontFamily: _font, fontWeight: FontWeight.w700, fontSize: 15, color: Colors.white)),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

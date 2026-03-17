@@ -16,12 +16,8 @@ const double _thumbSize     = 52.0;
 const double _shutterRadius = 42.0;
 const double _thumbGap      = 50.0;
 
-// ══════════════════════════════════════════════════════════
-// 촬영 화면
-// ══════════════════════════════════════════════════════════
 class CaptureScreen extends StatefulWidget {
   const CaptureScreen({super.key});
-
   @override
   State<CaptureScreen> createState() => _CaptureScreenState();
 }
@@ -30,8 +26,6 @@ class _CaptureScreenState extends State<CaptureScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // 모든 필수 촬영 완료 콜백 등록.
-    // 촬영완료 버튼 제거로 모든 케이스 자동 pop으로 통합.
     final provider = context.read<CaptureProvider>();
     provider.onAllMandatoryComplete = () {
       if (mounted) Navigator.of(context).pop(true);
@@ -40,7 +34,6 @@ class _CaptureScreenState extends State<CaptureScreen> {
 
   @override
   void dispose() {
-    // 화면 종료 시 콜백 해제 — 메모리 누수 및 해제된 context 참조 방지
     final provider = context.read<CaptureProvider>();
     provider.onAllMandatoryComplete = null;
     super.dispose();
@@ -59,10 +52,13 @@ class _CaptureScreenState extends State<CaptureScreen> {
         if (provider.cameraPermission == CameraPermission.denied) {
           return _CameraPermissionDenied(onRetry: provider.requestCameraPermission);
         }
+        // [수정] uploading 체크에 queued 추가
+        final showUploadIndicator =
+            provider.currentCapture?.status == UploadStatus.uploading ||
+            provider.currentCapture?.status == UploadStatus.queued;
+
         return Scaffold(
           backgroundColor: Colors.black,
-          // [정책] _SwipeDetector를 카메라 영역(Expanded)으로 축소.
-          // 상단 GuideCard의 캐러셀 가로 스크롤과 충돌 방지.
           body: Column(children: [
             _TopArea(onListTap: () => _showTaskModal(context, provider)),
             Expanded(
@@ -79,7 +75,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
                   Positioned(top: 32, left: 0, right: 0, child: _HintPill()),
                   const CaptureDoneBubble(),
                   const Positioned.fill(child: _SwipeArrows()),
-                  if (provider.currentCapture?.status == UploadStatus.uploading)
+                  if (showUploadIndicator)
                     const Positioned(top: 12, right: 12, child: _UploadIndicator()),
                   if (provider.isRecaptureMode)
                     Builder(builder: (ctx) {
@@ -98,8 +94,6 @@ class _CaptureScreenState extends State<CaptureScreen> {
                     bottom: _shutterBottom, left: 0, right: 0,
                     child: Center(child: ShutterButton(provider: provider)),
                   ),
-                  // [정책] 촬영완료 버튼 제거.
-                  // 모든 필수 촬영 완료 시 capture_provider에서 자동 pop.
                 ]),
               ),
             ),
@@ -137,33 +131,30 @@ class _CameraPermissionDenied extends StatelessWidget {
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(40),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.videocam_off_outlined, size: 64, color: Color(0xFFCBD5E1)),
-              const SizedBox(height: 20),
-              const Text('카메라 권한이 필요합니다',
-                  style: TextStyle(fontFamily: _font, fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
-              const SizedBox(height: 8),
-              const Text('업무 촬영을 위해 브라우저에서\n카메라 접근을 허용해주세요.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontFamily: _font, fontSize: 14, color: Color(0xFF64748B), height: 1.6)),
-              const SizedBox(height: 32),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: onRetry,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppTheme.blue,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                  child: const Text('다시 시도',
-                      style: TextStyle(fontFamily: _font, fontSize: 15, fontWeight: FontWeight.w700)),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            const Icon(Icons.videocam_off_outlined, size: 64, color: Color(0xFFCBD5E1)),
+            const SizedBox(height: 20),
+            const Text('카메라 권한이 필요합니다',
+                style: TextStyle(fontFamily: _font, fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
+            const SizedBox(height: 8),
+            const Text('업무 촬영을 위해 브라우저에서\n카메라 접근을 허용해주세요.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontFamily: _font, fontSize: 14, color: Color(0xFF64748B), height: 1.6)),
+            const SizedBox(height: 32),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: onRetry,
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppTheme.blue,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
+                child: const Text('다시 시도',
+                    style: TextStyle(fontFamily: _font, fontSize: 15, fontWeight: FontWeight.w700)),
               ),
-            ],
-          ),
+            ),
+          ]),
         ),
       ),
     );
@@ -257,14 +248,6 @@ class _BackButton extends StatelessWidget {
   }
 
   Future<void> _handleBack(BuildContext context, CaptureProvider provider) async {
-    // [미촬영 검증 주석시작] 필수 미완료 시 다이얼로그 비활성화
-    /*
-    if (provider.allMandatoryCaptured) {
-      if (context.mounted) Navigator.of(context).maybePop();
-      return;
-    }
-    */
-    // [미촬영 검증 주석끝] 어떤 상태든 바로 나가기
     if (context.mounted) Navigator.of(context).maybePop();
   }
 }
@@ -292,7 +275,6 @@ class _GroupDots extends StatelessWidget {
 
 // ══════════════════════════════════════════════════════════
 // 힌트 Pill
-// [UX Writing] "스와이프" → 고령 사용자 고려, 직관적 표현으로 개선
 // ══════════════════════════════════════════════════════════
 class _HintPill extends StatelessWidget {
   @override
@@ -344,16 +326,17 @@ class _UploadIndicator extends StatelessWidget {
 
 // ══════════════════════════════════════════════════════════
 // 스와이프 화살표
-// [정책] 순환 스와이프: 첫 도안 ↔ 마지막 도안 양방향 순환.
-//        화살표는 항상 표시 (끝 도안에서도 반대편 끝으로 이동 가능).
+// [수정] context.watch → context.read
+//   화살표 버튼은 콜백 참조만 필요하고 UI 변화 없음.
+//   watch 사용 시 provider 변경마다 불필요한 리빌드 발생.
 // ══════════════════════════════════════════════════════════
 class _SwipeArrows extends StatelessWidget {
   const _SwipeArrows();
 
   @override
   Widget build(BuildContext context) {
-    final provider = context.watch<CaptureProvider>();
-
+    // [성능 수정] watch → read: 화살표는 콜백만 필요, 상태 변화로 리빌드 불필요
+    final provider = context.read<CaptureProvider>();
     return Stack(children: [
       Positioned(
         top: 0, bottom: 0, left: 0, width: 64,
@@ -386,14 +369,11 @@ class _ArrowButton extends StatelessWidget {
 
 // ══════════════════════════════════════════════════════════
 // 스와이프 감지 — 카메라 영역 전용
-// [정책] GuideCard 캐러셀 가로 스크롤과 충돌하지 않도록
-//        Expanded(카메라 영역)에만 적용.
 // ══════════════════════════════════════════════════════════
 class _SwipeDetector extends StatefulWidget {
   final Widget child;
   final VoidCallback onSwipeLeft;
   final VoidCallback onSwipeRight;
-
   const _SwipeDetector({required this.child, required this.onSwipeLeft, required this.onSwipeRight});
 
   @override
@@ -409,30 +389,17 @@ class _SwipeDetectorState extends State<_SwipeDetector> {
   Widget build(BuildContext context) {
     return GestureDetector(
       behavior: HitTestBehavior.translucent,
-      onHorizontalDragStart: (d) {
-        _startX = d.localPosition.dx;
-        _committed = false;
-      },
+      onHorizontalDragStart: (d) { _startX = d.localPosition.dx; _committed = false; },
       onHorizontalDragUpdate: (d) {
         if (_startX == null || _committed) return;
         final dx = d.localPosition.dx - _startX!;
         if (dx.abs() >= _threshold) {
           _committed = true;
-          if (dx < 0) {
-            widget.onSwipeLeft();
-          } else {
-            widget.onSwipeRight();
-          }
+          if (dx < 0) widget.onSwipeLeft(); else widget.onSwipeRight();
         }
       },
-      onHorizontalDragEnd: (_) {
-        _startX = null;
-        _committed = false;
-      },
-      onHorizontalDragCancel: () {
-        _startX = null;
-        _committed = false;
-      },
+      onHorizontalDragEnd: (_) { _startX = null; _committed = false; },
+      onHorizontalDragCancel: () { _startX = null; _committed = false; },
       child: widget.child,
     );
   }
