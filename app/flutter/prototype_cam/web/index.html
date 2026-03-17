@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base href="$FLUTTER_BASE_HREF">
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <!-- 모바일 뷰포트: 390px 고정, 스케일 고정 -->
+  <meta name="viewport" content="width=390, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#E9EAEF">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Keeper Cam">
+  <meta http-equiv="Permissions-Policy" content="camera=(self)">
+  <meta http-equiv="Feature-Policy" content="camera 'self'">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+  <link rel="icon" type="image/png" href="favicon.png"/>
+  <title>Keeper Screenshot</title>
+  <link rel="manifest" href="manifest.json">
+
+  <!-- Spoqa Han Sans Neo CDN -->
+  <link rel="preconnect" href="https://spoqa.github.io">
+  <link rel="stylesheet" type="text/css" href="https://spoqa.github.io/spoqa-han-sans/css/SpoqaHanSansNeo.css">
+
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #E9EAEF;
+      font-family: 'S-Core Dream', 'Spoqa Han Sans Neo', 'Apple SD Gothic Neo', sans-serif;
+      -webkit-user-select: none;
+      user-select: none;
+      touch-action: pan-y;
+    }
+
+    flt-glass-pane { overflow: hidden !important; }
+
+    video {
+      width: 100% !important;
+      height: 100% !important;
+      object-fit: cover !important;
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <!-- 폰트 preload — S-Core Dream 모든 웨이트 강제 로드 (CanvasKit 인식용) -->
+  <div aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden;opacity:0;pointer-events:none;">
+    <span style="font-family:'S-Core Dream';font-weight:200;">가나다라마</span>
+    <span style="font-family:'S-Core Dream';font-weight:400;">가나다라마</span>
+    <span style="font-family:'S-Core Dream';font-weight:500;">가나다라마</span>
+    <span style="font-family:'S-Core Dream';font-weight:600;">가나다라마</span>
+    <span style="font-family:'S-Core Dream';font-weight:700;">가나다라마</span>
+    <span style="font-family:'Spoqa Han Sans Neo';font-weight:400;">가나다라마</span>
+  </div>
+  <script src="flutter_bootstrap.js" async></script>
+
+  <script>
+    // 모바일 브라우저 주소창 자동 숨김 유도
+    // 페이지 로드 후 살짝 스크롤해서 브라우저 UI를 밀어냄
+    window.addEventListener('load', function () {
+      setTimeout(function () {
+        window.scrollTo(0, 1);
+      }, 300);
+    });
+
+    // Fullscreen API — 사용자 탭/터치 시 전체화면 진입 시도
+    // (iOS Safari는 Fullscreen API 미지원이라 scrollTo 방식에 의존)
+    document.addEventListener('touchstart', function requestFS() {
+      const el = document.documentElement;
+      if (el.requestFullscreen) {
+        el.requestFullscreen({ navigationUI: 'hide' }).catch(() => {});
+      } else if (el.webkitRequestFullscreen) {
+        el.webkitRequestFullscreen();
+      }
+      // 한 번만 실행
+      document.removeEventListener('touchstart', requestFS);
+    }, { once: true });
+  </script>
+</body>
+</html>

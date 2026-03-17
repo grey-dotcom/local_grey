@@ -1,0 +1,174 @@
+[
+  {
+    "id": "group_1",
+    "title": "침실/거실",
+    "order": 1,
+    "items": [
+      {
+        "id": "item_1_1",
+        "order": 1,
+        "title": "침실공간",
+        "contents": "침대 및 주변 가구가 모두 보이도록 촬영해 주세요. 침대 정리 상태와 협탁, 조명 등 비품이 제자리에 있는지 확인 후 촬영해 주세요.",
+        "isMandatory": true,
+        "guideImageUrl": "https://images.unsplash.com/photo-1631049307264-da0ec9d70304?w=600",
+        "instructions": "침대 헤드보드가 프레임 상단에 오도록 앵글을 맞추고, 양쪽 협탁과 조명이 함께 나오게 촬영하세요."
+      },
+      {
+        "id": "item_1_2",
+        "order": 2,
+        "title": "옷장",
+        "contents": "옷장 문을 열어 내부 수납 비품(옷걸이, 슬리퍼, 여분 침구 등)이 정위치에 있는지 확인하고 내부가 보이도록 촬영해 주세요.",
+        "isMandatory": true,
+        "guideImageUrl": "https://images.unsplash.com/photo-1558997519-83ea9252edf8?w=600",
+        "instructions": "옷장 문을 완전히 열어 옷걸이·슬리퍼·여분 침구가 모두 보이도록 정면에서 촬영하세요."
+      },
+      {
+        "id": "item_1_3",
+        "order": 3,
+        "title": "룸 쓰레기통",
+        "contents": "쓰레기통 내부가 비워져 있고 새 봉투가 교체된 상태인지 확인하고, 내부가 보이도록 뚜껑을 열어 촬영해 주세요.",
+        "isMandatory": true,
+        "guideImageUrl": "https://images.unsplash.com/photo-1604187351574-c75ca79f5807?w=600",
+        "instructions": "뚜껑을 완전히 열어 새 봉투가 끼워진 내부가 잘 보이도록 위쪽 앵글에서 촬영하세요."
+      },
+      {
+        "id": "item_1_4",
+        "order": 4,
+        "title": "거실",
+        "contents": "소파, 테이블 등 거실 가구와 비품이 정리된 상태로 전체가 보이도록 넓게 촬영해 주세요.",
+        "isMandatory": true,
+        "guideImageUrl": "https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=600",
+        "instructions": "소파와 테이블이 모두 프레임에 들어오는 넓은 앵글로, 창문 빛을 등지지 않게 촬영하세요."
+      },
+      {
+        "id": "item_1_5",
+        "order": 5,
+        "title": "TV",
+        "contents": "TV 화면을 켠 상태에서 TV 주변 가구 및 비품이 함께 보이도록 촬영해 주세요.",
+        "isMandatory": false,
+        "guideImageUrl": null,
+        "instructions": null
+      },
+      {
+        "id": "item_1_6",
+        "order": 6,
+        "title": "내부 발코니/창",
+        "contents": "커튼을 완전히 열어 창틀이 보이는 상태에서 촬영해 주세요. 창문 잠금 여부도 함께 확인해 주세요.",
+        "isMandatory": false,
+        "guideImageUrl": null,
+        "instructions": null
+      },
+      {
+        "id": "item_1_7",
+        "order": 7,
+        "title": "외부 발코니",
+        "contents": "테라스 타입 객실에 해당하는 항목입니다. 외부 발코니 전체가 보이도록 넓게 촬영해 주세요.",
+        "isMandatory": false,
+        "guideImageUrl": null,
+        "instructions": null
+      }
+    ]
+  },
+  {
+    "id": "group_2",
+    "title": "주방",
+    "order": 2,
+    "items": [
+      {
+        "id": "item_2_1",
+        "order": 1,
+        "title": "주방 싱크대",
+        "contents": "싱크대 상부장과 하부장을 모두 열어 내부 비품(식기, 조리도구 등)이 정리된 상태를 확인하고 촬영해 주세요.",
+        "isMandatory": true,
+        "guideImageUrl": "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=600",
+        "instructions": "상부장·하부장 문을 모두 열어 식기와 조리도구가 잘 보이게 정면에서 촬영하세요."
+      },
+      {
+        "id": "item_2_2",
+        "order": 2,
+        "title": "싱크대 배수구",
+        "contents": "싱크대 배수구망이 청결하게 정리된 상태인지 확인하고, 배수구망이 잘 보이도록 가까이 촬영해 주세요.",
+        "isMandatory": true,
+        "guideImageUrl": "https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=600",
+        "instructions": "배수구망이 화면 중앙에 오도록 가까이 앵글을 맞춰 선명하게 촬영하세요."
+      },
+      {
+        "id": "item_2_3",
+        "order": 3,
+        "title": "세탁기와 세제구",
+        "contents": "세탁기 문을 열어 내부와 세제 투입구가 청결한 상태인지 확인하고, 내부가 보이도록 촬영해 주세요.",
+        "isMandatory": false,
+        "guideImageUrl": null,
+        "instructions": null
+      },
+      {
+        "id": "item_2_4",
+        "order": 4,
+        "title": "냉장/냉동고",
+        "contents": "냉장고와 냉동고 문을 열어 물 세팅 및 내부 비품이 정위치에 있는지 확인하고, 내부가 보이도록 촬영해 주세요.",
+        "isMandatory": true,
+        "guideImageUrl": "https://images.unsplash.com/photo-1571175443880-49e1d25b2bc5?w=600",
+        "instructions": "냉장·냉동 문을 모두 열어 물 세팅 및 내부 비품 전체가 한 프레임에 들어오게 촬영하세요."
+      },
+      {
+        "id": "item_2_5",
+        "order": 5,
+        "title": "커피 스테이션",
+        "contents": "커피머신, 커피포트, 커피 캡슐 등 비품이 정위치에 있는지 확인하고, 전체가 보이도록 촬영해 주세요.",
+        "isMandatory": false,
+        "guideImageUrl": null,
+        "instructions": null
+      }
+    ]
+  },
+  {
+    "id": "group_3",
+    "title": "화장실",
+    "order": 3,
+    "items": [
+      {
+        "id": "item_3_1",
+        "order": 1,
+        "title": "세면대",
+        "contents": "세면대 위 비품(칫솔, 치약, 비누 등 어메니티)이 정위치에 있는지 확인하고, 세면대 전체가 보이도록 촬영해 주세요.",
+        "isMandatory": true,
+        "guideImageUrl": "https://images.unsplash.com/photo-1552321554-5fefe8c9ef14?w=600",
+        "instructions": "어메니티가 세면대 위에 정렬된 상태로 세면대 전체가 프레임에 들어오게 촬영하세요."
+      },
+      {
+        "id": "item_3_2",
+        "order": 2,
+        "title": "변기와 화장실 쓰레기통",
+        "contents": "변기 커버를 열어 내부가 보이는 상태에서 촬영하고, 옆에 위치한 쓰레기통 내부도 함께 보이도록 촬영해 주세요.",
+        "isMandatory": true,
+        "guideImageUrl": "https://images.unsplash.com/photo-1584622781867-1c5fe959dac0?w=600",
+        "instructions": "변기 커버를 열고 쓰레기통이 함께 보이도록 측면 앵글에서 촬영하세요."
+      },
+      {
+        "id": "item_3_3",
+        "order": 3,
+        "title": "샤워실",
+        "contents": "샤워실 내부 비품(샴푸, 린스, 바디워시 등)과 바닥 배수구가 청결한지 확인하고, 전체가 보이도록 촬영해 주세요.",
+        "isMandatory": false,
+        "guideImageUrl": null,
+        "instructions": null
+      }
+    ]
+  },
+  {
+    "id": "group_4",
+    "title": "현관",
+    "order": 4,
+    "items": [
+      {
+        "id": "item_4_1",
+        "order": 1,
+        "title": "신발장",
+        "contents": "신발장 문을 열어 내부 전체가 보이도록 촬영해 주세요. 슬리퍼 등 비품이 정위치에 있는지 확인 후 촬영해 주세요.",
+        "isMandatory": true,
+        "guideImageUrl": "https://images.unsplash.com/photo-1558997519-83ea9252edf8?w=600",
+        "instructions": "신발장 문을 완전히 열어 내부 비품이 모두 보이게 정면에서 촬영하세요."
+      }
+    ]
+  }
+]

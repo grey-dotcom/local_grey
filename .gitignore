@@ -1,0 +1,49 @@
+# =============================================
+# local_grey 루트 .gitignore
+# =============================================
+
+# macOS 시스템 파일
+.DS_Store
+**/.DS_Store
+
+# 환경변수 (API 키 등 민감 정보 — 절대 올리면 안 됨)
+.env
+.env.*
+
+# 로컬 git 저장소
+git_repo/
+
+# IDE 설정
+*.code-workspace
+.vscode/
+
+# 임시 작업 폴더 (로컬 전용)
+workspace/
+
+# ── Flutter prototype_cam ──────────────────
+app/flutter/prototype_cam/build/
+app/flutter/prototype_cam/.dart_tool/
+app/flutter/prototype_cam/.pub-cache/
+app/flutter/prototype_cam/.pub/
+app/flutter/prototype_cam/.firebase/
+app/flutter/prototype_cam/.firebaserc
+app/flutter/prototype_cam/firebase.json
+app/flutter/prototype_cam/.vscode/
+app/flutter/prototype_cam/assets/fonts/
+app/flutter/prototype_cam/.flutter-plugins
+app/flutter/prototype_cam/.flutter-plugins-dependencies
+
+# ── Next.js prototype_cam_ts ───────────────
+web/react/prototype_cam_ts/.next/
+web/react/prototype_cam_ts/out/
+web/react/prototype_cam_ts/node_modules/
+web/react/prototype_cam_ts/.env
+web/react/prototype_cam_ts/.env.local
+web/react/prototype_cam_ts/.firebase/
+web/react/prototype_cam_ts/.firebaserc
+web/react/prototype_cam_ts/firebase.json
+
+# ── 배포 로그 (로컬에서만 기록) ────────────
+deploy/deploy.log
+deploy/LATEST_DEPLOY.txt
+deploy/production/

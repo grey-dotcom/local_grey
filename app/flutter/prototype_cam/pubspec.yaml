@@ -1,0 +1,50 @@
+name: prototype_cam
+description: Keeper 서비스 카메라 촬영 모듈 — Web 프로토타입
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  # [버그 수정 노트] SDK 제약 >=3.0.0 → >=3.6.0 으로 상향.
+  # camera_service.dart에서 Dart 3.6 API(JSArray 인덱스 접근 등) 사용 중.
+  # image_picker_web.dart도 Dart 3.4 API 사용 중 → 3.6으로 통일.
+  sdk: '>=3.6.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # 상태 관리
+  provider: ^6.1.2
+
+  # 네트워크 (업로드 API)
+  http: ^1.2.2
+
+  # Web API (dart:html 대체 — Flutter 3.22+ / Dart 3.4+)
+  # [개발자] dart:html은 Dart 3.x에서 deprecated → package:web으로 마이그레이션됨
+  web: ^1.1.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/task_data.json
+    - assets/app_config.json
+    - assets/report_data.json
+
+  fonts:
+    - family: S-Core Dream
+      fonts:
+        - asset: assets/fonts/SCDream2.otf
+          weight: 200
+        - asset: assets/fonts/SCDream4.otf
+          weight: 400
+        - asset: assets/fonts/SCDream5.otf
+          weight: 500
+        - asset: assets/fonts/SCDream6.otf
+          weight: 600
+        - asset: assets/fonts/SCDream7.otf
+          weight: 700
