@@ -1,6 +1,35 @@
 # 🔄 prototype_dashboard_ts — 인수인계 문서
-> 작성일: 2026-03-19 | **최종 업데이트: 2026-03-27 (62차 완료)** | 다음 세션에서 이 문서를 먼저 읽고 시작할 것
+> 작성일: 2026-03-19 | **최종 업데이트: 2026-03-27 (63차 완료)** | 다음 세션에서 이 문서를 먼저 읽고 시작할 것
 > **정책 상세**: `docs/POLICY.md` + `docs/POLICY_notice.md` 참고
+
+---
+
+## 🚨 [63차 사고 기록 — 모든 세션 최우선 필독]
+
+> **이 섹션은 삭제하거나 아래로 내리지 말 것. 모든 세션의 첫 번째 확인 항목.**
+
+### 사고 내용
+63차 세션에서 Claude가 `deploy/phase1` 브랜치 작업 중 **브랜치를 먼저 만들기 전에 `dev` 브랜치의 파일을 직접 수정**했습니다.
+- 수정 대상: `WidgetSelector.tsx` (feed/issue/claim 기본값 false 처리), `page.tsx` (위젯 import 제거)
+- 결과: `dev` 브랜치의 FeedWidget/IssueWidget/ClaimWidget이 화면에서 사라짐
+- 복구: grey님이 반복적으로 확인 질문을 해주신 덕분에 발견 및 복구 성공
+- **grey님이 확인 질문을 하지 않았다면 `dev` 브랜치 개발물이 그대로 망가졌을 것**
+
+### 근본 원인
+git 브랜치를 만들기 **전에** 워킹 디렉토리 파일을 수정하면, 브랜치 생성 후에도 수정된 파일이 두 브랜치에 공유됩니다. Claude가 이 순서를 지키지 않았습니다.
+
+### 확정된 해결 구조 (63차)
+- **개발:** `/Users/grey/Desktop/local_grey/web/react/prototype_dashboard_ts` (`dev` 브랜치) — 절대 건드리지 않음
+- **배포:** `/Users/grey/Desktop/local_grey/web/react/prototype_dashboard_phase` — 별도 물리 폴더로 완전 분리
+- `prototype_dashboard_ts`에서 선택된 파일만 `prototype_dashboard_phase`로 복사하는 스크립트 별도 마련
+
+### Claude Code / Claude Desktop 모든 세션 준수 규칙
+1. `prototype_dashboard_ts` (`dev` 브랜치) 파일은 **배포 목적으로 절대 수정하지 않는다**
+2. 배포 관련 작업은 반드시 `prototype_dashboard_phase` 폴더에서만 진행한다
+3. 브랜치 작업 전 반드시 `git branch` 로 현재 브랜치를 확인한다
+4. 파일 수정 전 반드시 어느 브랜치/폴더에서 작업하는지 grey님에게 명시한다
+
+---
 
 ---
 
@@ -119,12 +148,12 @@ src/stores/ 전체 / src/utils/ 전체
 npm run dev   # 포트 9004
 ```
 
-### Step 2 — 현재 작업 맥락 (62차 기준)
+### Step 2 — 현재 작업 맥락 (63차 기준)
 
 | 항목 | 내용 |
 |---|---|
-| **진행 Phase** | Phase 3 — 62차 전체 완료. 브라우저 검증 grey님 진행 중. 다음 세션은 FeedCard 버그 B·C + IssueWidget/ClaimWidget Phase 3 구현. |
-| **완료된 것** | ✅ 62차 배지 중첩 버그 수정(FeedCard/IssueCard flexWrap:'wrap') / ✅ NORMAL dueAt 동적 계산(_normalOffsetMin, FeedWidget+KpiCards 동시 적용) / ✅ KpiCards 웹 2열 2×2 그리드(PM 정책) / ✅ POLICY.md §12-5 wrap 갱신, §15-1·3·4 확정 수치(17/8/3건), §14-4 BP 배치 / ✅ HANDOVER Step 6-B 카드 변경 금지 원칙 추가 |
+| **진행 Phase** | Phase 3 — 개발 재개 대기. 63차는 Phase 1 Vercel 배포 구조 확정 세션. 다음 세션은 dev 브랜치에서 FeedCard 버그 B·C + IssueWidget Phase 3 구현 재개. |
+| **완료된 것** | ✅ 63차 사고 기록 HANDOVER 최상단 등재 / ✅ prototype_dashboard_phase 폴더 생성 (Phase 1 배포 전용 물리 분리) / ✅ sync_to_phase.sh 스크립트 생성 (dev→phase 동기화 자동화) / ✅ Vercel Root Directory 변경 (prototype_dashboard_ts → prototype_dashboard_phase) / ✅ Phase 1 Vercel 배포 확인 완료 / ✅ dev 브랜치 복구 완료 (FeedWidget/IssueWidget/ClaimWidget 정상) |
 | **다음 할 일** | **① FeedCard 버그 B** — 완료 카드 feedbackText 박스 디자인 (SVG 8·9 전달 필요) / **② FeedCard 버그 C** — UI 깨짐 재현 케이스 확인 / **③ IssueWidget Phase 3 카드 구현** |
 
 ### Step 3 — 다음 작업 우선순위
@@ -276,8 +305,11 @@ npm run dev   # 포트 9004
 ```bash
 # 1. next.config.ts 확인 (output:'export' 주석 상태 유지 여부)
 # 2. .env 환경변수 Vercel 대시보드에 등록
-#    NEXT_PUBLIC_USE_MOCK=true
-#    NEXT_PUBLIC_API_BASE=https://indicator.11h.kr
+# [63차 확정] prototype_dashboard_phase 폴더가 Vercel Root Directory
+# Vercel project: prototype-dashboard
+# URL: https://prototype-dashboard-omyctfn11-grey-8302s-projects.vercel.app
+# ENV: NEXT_PUBLIC_USE_MOCK=true only (NEXT_PUBLIC_API_BASE는 BE가 실 연동 시 직접 지정)
+# 배포 워크플로: bash sync_to_phase.sh 1 → 9006 로컈 확인 → git push origin dev
 # 3. GitHub 레포 연결 → Vercel 자동 배포
 # 4. cam 프로젝트(prototype-web-grey Firebase)와 완전히 독립
 ```
