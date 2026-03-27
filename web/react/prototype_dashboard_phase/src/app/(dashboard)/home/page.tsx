@@ -101,7 +101,8 @@ export default function HomePage() {
     setWidgetSelectorOpen((prev) => !prev);
   };
 
-  // [Phase 1] 피드/처리필요/클레임 위젯 탭 — Phase 2 이후 활성화 예정
+  // visible 탭 목록 (POLICY §14-3: OFF 위젯 탭에서도 제거)
+  // singleColTab이 OFF된 경우 첫 번째 visible 탭으로 교정
 
   return (
     <div className="flex flex-col min-h-full" style={{ opacity: isReady ? 1 : 0, transition: 'opacity 0.15s ease' }}>
@@ -145,7 +146,119 @@ export default function HomePage() {
           />
         )}
 
-        {/* [Phase 1] 변경사항 피드 / 처리필요 / 클레임 위젯 — Phase 2 이후 추가 예정 */}
+        {/* Feed / Issue / Claim (POLICY §14-3: OFF 위젯 제거, 나머지 당겨서 채움)
+         * 모든 위젯 OFF 시 안내 문구 표시 (Phase 1 정책서 확정) */}
+        {/* 모든 피드 위젯 OFF 상태 안내 */}
+        {!widgetVisibility.feed && !widgetVisibility.issue && !widgetVisibility.claim && (
+          <div style={{
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+            paddingTop: 80, paddingBottom: 80, gap: 12,
+          }}>
+            <span style={{ fontSize: 14, color: 'rgba(0,0,0,0.38)', textAlign: 'center' }}>
+              선택한 위젯이 없습니다. 위젯 설정에서 위젯을 선택해 주세요.
+            </span>
+            <button
+              type="button"
+              onClick={(e) => {
+                const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect();
+                handleWidgetSettingClick(rect);
+              }}
+              style={{
+                background: 'none', border: 'none', cursor: 'pointer',
+                color: '#1976D2', fontSize: 14, fontWeight: 500,
+                textDecoration: 'underline', padding: 0,
+              }}
+            >
+              위젯 설정 열기
+            </button>
+          </div>
+        )}
+        {isSingleColumnActual ? (
+          /* 1열 + 세그먼트 탭 (POLICY §3-7) */
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+              <div style={{ height: 40, borderRadius: 8, overflow: 'hidden', display: 'flex', width: '100%' }}>
+                  const label = key === 'feed' ? '변경사항 피드' : key === 'issue' ? '처리필요' : '클레임';
+                  const count = key === 'feed' ? 7 : key === 'issue' ? 2 : 1; // TODO: 실제 카운트
+                  const isFirst = idx === 0;
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setSingleColTab(key)}
+                      style={{
+                        flex: 1, height: 40, paddingInline: 8, paddingBlock: 8,
+                        background: isActive ? '#212121' : 'white',
+                        border: 'none',
+                        borderTop:    isActive ? 'none' : '1px solid #E0E0E0',
+                        borderBottom: isActive ? 'none' : '1px solid #E0E0E0',
+                        borderRight:  isLast  ? (isActive ? 'none' : '1px solid #E0E0E0') : '1px solid #E0E0E0',
+                        borderLeft:   isFirst ? (isActive ? 'none' : '1px solid #E0E0E0') : 'none',
+                        borderTopLeftRadius:     isFirst ? 8 : 0,
+                        borderBottomLeftRadius:  isFirst ? 8 : 0,
+                        borderTopRightRadius:    isLast  ? 8 : 0,
+                        borderBottomRightRadius: isLast  ? 8 : 0,
+                        cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+                        fontFamily: 'inherit',
+                      }}
+                    >
+                      <span style={{ fontSize: 12, fontWeight: 500, lineHeight: '20px', letterSpacing: '0.20px', color: isActive ? 'white' : '#757575', whiteSpace: 'nowrap' }}>
+                        {label}
+                      </span>
+                      <span style={{ width: 20, height: 20, borderRadius: 14, background: isActive ? 'white' : '#F5F5F5', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: 'rgba(0,0,0,0.87)', paddingBottom: 1, flexShrink: 0 }}>
+                        {count}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* 탭 콘텐츠 */}
+          </div>
+
+        ) : (
+          /* 그리드 레이아웃 (POLICY §3-8 + §14-3: OFF 위젯 제거, 나머지 당겨서 채움) */
+          <>
+            {desktopCols === 3 ? (
+              /* 웹 3열
+               * [DOM 구조 설계 이유]
+               * 각 위젯을 <div style={{ flex:'1 1 0', minWidth:0 }}>로 감싼 이유:
+               *     자체 루트 div가 'width:100%'로 고정되어 있음.
+               *   - flex-item 역할(flex:1 1 0, minWidth:0)을 위젯 내부에 넣으면
+               *     위젯이 단독으로 쓰일 때와 그리드 안에서 쓰일 때 스타일이 달라져
+               *     컴포넌트 재사용성이 떨어짐.
+               *   - wrapper div 하나로 flex-item 역할을 분리하면 위젯은 항상
+               *     '컨테이너를 꽉 채우는' 단순한 역할만 유지할 수 있음.
+               * [리팩토링 시점] 실 서비스 연동 시 위젯에 flex prop을 직접 받도록
+               *   수정하면 이 wrapper div를 제거할 수 있음. (FE 검토 의견 참고) */
+              <div style={{ display: 'flex', gap: GAP, width: '100%', alignItems: 'flex-start' }}>
+              </div>
+            ) : (
+              /* 웹·모바일 2열 (POLICY §3-8, 40차 확정)
+               * 좌 컬럼: Feed → Claim 세로 / 우 컬럼: Issue
+               * OFF 시 해당 위젯 제거, 나머지가 앞으로 당겨짐
+               *
+               * [DOM 구조 설계 이유 — 우 컬럼 wrapper div 유지 이유]
+               *   보이지만, HANDOVER Step 3에 '4번 위젯 예정' 항목이 있음.
+               *   gap과 flexDirection:column 역할을 담당해야 하므로 미리 유지.
+               *   지금 제거하면 4번 위젯 추가 시 다시 wrapper를 넣어야 함.
+               * [리팩토링 시점] 4번 위젯이 확정되지 않거나 다른 레이아웃으로
+               *   결정되면 그 시점에 재검토. */
+              <div style={{ display: 'flex', gap: GAP, width: '100%', alignItems: 'flex-start' }}>
+                {(widgetVisibility.feed || widgetVisibility.claim) && (
+                  <div style={{ flex: '1 1 0', minWidth: 0, display: 'flex', flexDirection: 'column', gap: GAP }}>
+                  </div>
+                )}
+                {widgetVisibility.issue && (
+                  <div style={{ flex: '1 1 0', minWidth: 0, display: 'flex', flexDirection: 'column', gap: GAP }}>
+                  </div>
+                )}
+              </div>
+            )}
+          </>
+        )}
       </div>
 
     </div>
