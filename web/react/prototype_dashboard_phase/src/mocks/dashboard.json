@@ -1,0 +1,49 @@
+{
+  "_comment": "그레이 테스트 1 — 지점별 KPI 샘플 데이터",
+  "_workspace": "WORK01XXXXXXXXXXXXXXXXXXXXXXXXX2",
+  "_basis": "각 지점별 서로 다른 수치로 구성. completionRate = completedCount / (completedCount + incompleteCount) * 100",
+
+  "byRoomGroup": {
+    "RG01XXXXXXXXXXXXXXXXXXXXXXXXXXX1": {
+      "_name": "강남점",
+      "delayedCount": 2,
+      "urgentCount": 1,
+      "unresolvedIssueCount": 3,
+      "unconfirmedClaimCount": 2,
+      "completionRate": 33,
+      "completedCount": 2,
+      "incompleteCount": 4
+    },
+    "RG01XXXXXXXXXXXXXXXXXXXXXXXXXXX2": {
+      "_name": "역삼점",
+      "delayedCount": 0,
+      "urgentCount": 2,
+      "unresolvedIssueCount": 1,
+      "unconfirmedClaimCount": 0,
+      "completionRate": 50,
+      "completedCount": 3,
+      "incompleteCount": 3
+    },
+    "RG01XXXXXXXXXXXXXXXXXXXXXXXXXXX3": {
+      "_name": "홍대점",
+      "delayedCount": 1,
+      "urgentCount": 0,
+      "unresolvedIssueCount": 2,
+      "unconfirmedClaimCount": 1,
+      "completionRate": 17,
+      "completedCount": 1,
+      "incompleteCount": 5
+    }
+  },
+
+  "all": {
+    "_name": "전체",
+    "delayedCount": 3,
+    "urgentCount": 3,
+    "unresolvedIssueCount": 6,
+    "unconfirmedClaimCount": 3,
+    "completionRate": 33,
+    "completedCount": 6,
+    "incompleteCount": 12
+  }
+}

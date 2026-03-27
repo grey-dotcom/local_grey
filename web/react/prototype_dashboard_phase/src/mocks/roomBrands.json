@@ -1,0 +1,22 @@
+[
+  {
+    "brandId": "BRAND01XXXXXXXXXXXXXXXXXXXXXXXX1",
+    "brandName": "그레이 호텔",
+    "workspaceId": "WORK01XXXXXXXXXXXXXXXXXXXXXXXXX2"
+  },
+  {
+    "brandId": "BRAND01XXXXXXXXXXXXXXXXXXXXXXXX2",
+    "brandName": "그레이 모텔",
+    "workspaceId": "WORK01XXXXXXXXXXXXXXXXXXXXXXXXX2"
+  },
+  {
+    "brandId": "BRAND01XXXXXXXXXXXXXXXXXXXXXXXX3",
+    "brandName": "블루 레지던스",
+    "workspaceId": "WORK01XXXXXXXXXXXXXXXXXXXXXXXXX3"
+  },
+  {
+    "brandId": "BRAND01XXXXXXXXXXXXXXXXXXXXXXXX4",
+    "brandName": "블루 게스트하우스",
+    "workspaceId": "WORK01XXXXXXXXXXXXXXXXXXXXXXXXX3"
+  }
+]

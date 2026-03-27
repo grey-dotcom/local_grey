@@ -1,0 +1,19 @@
+{
+  "workspaceCode": "grey-test-1",
+  "isHeadquarter": true,
+  "isWorkspaceOwner": false,
+  "isPartner": false,
+  "workspaceId": "WORK01XXXXXXXXXXXXXXXXXXXXXXXXX2",
+  "workspaceName": "그레이 테스트 1",
+  "workspaceStaffRegistrationType": null,
+  "email": "admin@example.com",
+  "name": "관리자",
+  "staffId": "STFF01XXXXXXXXXXXXXXXXXXXXXXXXX1",
+  "phoneNumber": "01000000000",
+  "authority": "HEADQUARTER",
+  "supplyPrice": [],
+  "partnerPrice": [],
+  "keeperPrice": [],
+  "keeperLevelUpPoint": [],
+  "isAirSupplyConnected": false
+}
