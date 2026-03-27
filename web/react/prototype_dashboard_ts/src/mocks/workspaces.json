@@ -1,0 +1,12 @@
+[
+  {
+    "workspaceId": "WORK01XXXXXXXXXXXXXXXXXXXXXXXXX2",
+    "workspaceCode": "grey-test-1",
+    "workspaceName": "그레이 테스트 1"
+  },
+  {
+    "workspaceId": "WORK01XXXXXXXXXXXXXXXXXXXXXXXXX3",
+    "workspaceCode": "grey-test-2",
+    "workspaceName": "그레이 테스트 2"
+  }
+]

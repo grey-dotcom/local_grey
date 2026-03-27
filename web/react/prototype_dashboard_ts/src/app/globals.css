@@ -1,0 +1,70 @@
+/**
+ * @file app/globals.css
+ * @description 전역 스타일 — shadcn CSS 변수 + 폰트
+ *
+ * 폰트 전략:
+ * - Pretendard: 한글 본문 (CDN — 로컬 설치 시 /public/fonts/ 로 교체)
+ * - Noto Sans KR: 폴백
+ * 피그마 색상 토큰 기준:
+ * - GNB background: #212121
+ * - Primary blue: #2563EB
+ * - Grey 100: #F5F5F5
+ */
+
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 13%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 13%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 13%;
+
+    --primary: 221 83% 53%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 0 0% 96%;
+    --secondary-foreground: 0 0% 13%;
+
+    --muted: 0 0% 96%;
+    --muted-foreground: 0 0% 45%;
+
+    --accent: 0 0% 96%;
+    --accent-foreground: 0 0% 13%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 0 0% 90%;
+    --input: 0 0% 90%;
+    --ring: 221 83% 53%;
+
+    --radius: 0.5rem;
+
+    /* 피그마 커스텀 토큰 */
+    --gnb-bg: #212121;
+    --gnb-width: 64px;
+    --sub-sidebar-width: 240px;
+    --topbar-height: 56px;
+    --grey-100: #F5F5F5;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Pretendard', 'Noto Sans KR', sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+}

@@ -1,0 +1,65 @@
+{
+  "_comment": "그레이 테스트 1 — 클레임 샘플 데이터",
+  "_policy": "지점별 미확인(PENDING) 건수 차별화: 강남점 1건 / 역삼점 2건 / 홍대점 0건 = 미확인 합계 3건",
+  "_claim_statuses": "PENDING(처리 대기) / COMPLETED(완료)",
+  "content": [
+    {
+      "claimId": "CLAM-W1-001",
+      "claimStatus": "PENDING",
+      "isNew": true,
+      "roomGroupId": "RG01XXXXXXXXXXXXXXXXXXXXXXXXXXX1",
+      "roomGroupName": "강남점",
+      "roomName": "5층 · 501호",
+      "reporterName": "투숙객",
+      "reportedAt": "2026-03-23T07:20:00",
+      "description": "침실 및 거실 구석 먼지 제거가 되지 않았으며, 침대 아래 청소 흔적이 전혀 없음. 화장실 거울에 물자국 다수 발견. 전체 재청소 요청.",
+      "photoUrls": [],
+      "comment": null
+    },
+    {
+      "claimId": "CLAM-W1-002",
+      "claimStatus": "PENDING",
+      "isNew": true,
+      "roomGroupId": "RG01XXXXXXXXXXXXXXXXXXXXXXXXXXX2",
+      "roomGroupName": "역삼점",
+      "roomName": "7층 · 701호",
+      "reporterName": "투숙객",
+      "reportedAt": "2026-03-23T08:05:00",
+      "description": "세면대 배수구가 막혀 물이 역류함. 세면대 주변 바닥에 물이 고여 미끄럼 위험. 긴급 수리 요청.",
+      "photoUrls": [],
+      "comment": null
+    },
+    {
+      "claimId": "CLAM-W1-003",
+      "claimStatus": "PENDING",
+      "isNew": false,
+      "roomGroupId": "RG01XXXXXXXXXXXXXXXXXXXXXXXXXXX2",
+      "roomGroupName": "역삼점",
+      "roomName": "4층 · 402호",
+      "reporterName": "투숙객",
+      "reportedAt": "2026-03-22T21:30:00",
+      "description": "냉방 기능 이상으로 실내 온도 조절 불가. 다음날 아침까지 해결 요청.",
+      "photoUrls": [],
+      "comment": null
+    },
+    {
+      "claimId": "CLAM-W1-004",
+      "claimStatus": "COMPLETED",
+      "isNew": false,
+      "roomGroupId": "RG01XXXXXXXXXXXXXXXXXXXXXXXXXXX3",
+      "roomGroupName": "홍대점",
+      "roomName": "2층 · 205호",
+      "reporterName": "투숙객",
+      "reportedAt": "2026-03-22T14:00:00",
+      "completedAt": "_TODAY_T10:00:00",
+      "_completedAt_role": "TODAY",
+      "description": "샤워기 수압이 너무 약하여 샤워가 어려운 상황.",
+      "photoUrls": [],
+      "comment": "수압 조절 완료. 투숙객 확인 후 만족 의견 수령."
+    }
+  ],
+  "totalElements": 4,
+  "totalPages": 1,
+  "page": 0,
+  "size": 10
+}
