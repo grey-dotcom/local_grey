@@ -189,75 +189,13 @@ export function WidgetSelector({
                 </span>
               </div>
 
-              {/* 우측: 아코디언 화살표 + 토글 */}
-              <div style={{ display: 'flex', alignItems: 'center', paddingRight: 16, gap: 0 }}>
-                {hasChildren && (
-                  <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); setKpiExpanded((p) => !p); }}
-                    style={{
-                      border: 'none', background: 'transparent', cursor: 'pointer',
-                      padding: '4px 6px', display: 'flex', alignItems: 'center',
-                    }}
-                  >
-                    {/* 펼침: rotate(0deg)=아래↓ / 닫힘: rotate(-180deg)=위↑ (60차: 상하 방향으로 변경) */}
-                    <svg
-                      width="16" height="16" viewBox="0 0 24 24" fill="none"
-                      style={{
-                        transform: kpiExpanded ? 'rotate(0deg)' : 'rotate(-180deg)',
-                        transition: 'transform 0.2s',
-                      }}
-                    >
-                      <path d="M7 10l5 5 5-5" stroke="rgba(0,0,0,0.45)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                  </button>
-                )}
+              {/* 우측: 토글 (Phase 1 — 아코디언 화살표 제거) */}
+              <div style={{ display: 'flex', alignItems: 'center', paddingRight: 16 }}>
                 <ToggleSwitch checked={currentVis[key]} onChange={() => handleToggle(key)} />
               </div>
             </div>
 
-            {/* KPI 하위 아코디언 */}
-            {isKpi && (
-              <div style={{
-                maxHeight: kpiExpanded && currentVis.kpi ? 400 : 0,
-                overflow: 'hidden',
-                transition: 'max-height 0.25s ease',
-              }}>
-                {KPI_SUB_WIDGETS.map(({ key: subKey, label: subLabel, iconSrc, iconW = 20 }) => (
-                  <div
-                    key={subKey}
-                    style={{
-                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                      cursor: 'pointer',
-                    }}
-                    onClick={() => handleToggle(subKey)}
-                  >
-                    <div style={{
-                      flex: 1, display: 'flex', alignItems: 'center',
-                      paddingLeft: paddingLeft + 16, paddingRight: 16,
-                      paddingTop: 4, paddingBottom: 4,
-                      overflow: 'hidden',
-                    }}>
-                      <div style={{ minWidth: 36, display: 'flex', alignItems: 'center' }}>
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={iconSrc} alt="" width={iconW} height={iconW} style={{ objectFit: 'contain' }} />
-                      </div>
-                      <span style={{
-                        color: currentVis[subKey] ? TEXT_PRIMARY : 'rgba(0,0,0,0.45)',
-                        fontSize: 14,
-                        fontFamily: 'Noto Sans KR, Pretendard, sans-serif',
-                        fontWeight: 400, lineHeight: '22px', letterSpacing: '0.20px',
-                      }}>
-                        {subLabel}
-                      </span>
-                    </div>
-                    <div style={{ paddingRight: 16 }}>
-                      <ToggleSwitch checked={currentVis[subKey]} onChange={() => handleToggle(subKey)} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+            {/* KPI 하위 아코디언 — Phase 1 제거 */}
           </div>
         );
       })}

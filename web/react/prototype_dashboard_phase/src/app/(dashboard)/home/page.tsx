@@ -1,9 +1,8 @@
 /**
  * @file app/(dashboard)/home/page.tsx
- * @description 대시보드 메인 페이지 — Phase 1 배포 전용 (KPI만 노출)
- * @phase 1
- * @note FeedWidget / IssueWidget / ClaimWidget 은 Phase 1 에서 제외
- *       dev 브랜치(prototype_dashboard_ts)를 참고해 Phase 1 전용으로 작성
+ * @description 대시보드 메인 페이지 — Phase 1 전용
+ * Phase 2 위젯(FeedWidget, IssueWidget, ClaimWidget) 미포함
+ * sync_to_phase.sh가 page.phase1.tsx를 복사하여 생성합니다.
  */
 
 'use client';
@@ -16,42 +15,27 @@ import { WidgetSelector } from '@/components/dashboard/WidgetSelector';
 import { useLayoutContext } from '../layoutContext';
 import type { Notice } from '@/types/notice';
 
-// MOBILE_BP: 41차 확정 — 사이드바 BP 제외, 칠드런만 기준
-// = 웹 위젯(416px)×2 + gap(16) + GNB(64) + PAD(48) = 960px
-const MOBILE_BP     = 960;
-const SINGLE_COL_BP = 717; // 모바일 위젯(327)×2 + gap(16) + pad(48) = 718 ≈ 717
-
-const GNB_W       = 64;
-const SUB_W       = 260;
-const PAD_DESKTOP = 48;
-const PAD_MOBILE  = 32;
-
-// ⚠️ 연관 맥락 전체 검토 없이 임의 변경 금지 (POLICY § 3-2, HANDOVER Step 5)
-const MIN_1COL_CHILDREN = 1280; // 웹 3열 최소: 416×3 + gap×2 = 1280
-const MIN_2COL_CHILDREN = 685;  // 모바일 2열 최소: 717 - 32 = 685
-
-function calcChildrenWidth(viewportW: number, subOpen: boolean): number {
-  const sidebar = subOpen ? GNB_W + SUB_W : GNB_W;
-  return viewportW - sidebar - PAD_DESKTOP;
-}
+const MOBILE_BP         = 960;
+const PAD_DESKTOP       = 48;
+const PAD_MOBILE        = 32;
+const MIN_1COL_CHILDREN = 1280;
+const MIN_2COL_CHILDREN = 685;
 
 function calcMobileChildrenWidth(viewportW: number): number {
   return viewportW - PAD_MOBILE;
 }
 
 export default function HomePage() {
-  const [isMobile, setIsMobile] = useState(false);
-  const [viewport, setViewport] = useState(0);
+  const [isMobile, setIsMobile]   = useState(false);
+  const [viewport, setViewport]   = useState(0);
   const [childrenW, setChildrenW] = useState(0);
-  // isReady: 첫 측정 완료 전까지 opacity:0 유지 — BP 깨짐 방지
-  const [isReady, setIsReady] = useState(false);
-  const [notices, setNotices] = useState<Notice[]>([]);
+  const [isReady, setIsReady]     = useState(false);
+  const [notices, setNotices]     = useState<Notice[]>([]);
   const mainRef = useRef<HTMLElement | null>(null);
 
-  // POLICY §14: widgetVisibility는 layoutContext에서 가져옴 (MobileHeader와 공유)
   const { widgetVisibility, setWidgetVisibility } = useLayoutContext();
   const [widgetSelectorOpen, setWidgetSelectorOpen] = useState(false);
-  const [widgetAnchorRect, setWidgetAnchorRect] = useState<DOMRect | null>(null);
+  const [widgetAnchorRect, setWidgetAnchorRect]     = useState<DOMRect | null>(null);
 
   useEffect(() => {
     const vwObserver = new ResizeObserver((entries) => {
@@ -89,7 +73,10 @@ export default function HomePage() {
     import('@/mocks/notices.json').then((mod) => setNotices(mod.default as Notice[]));
   }, []);
 
-  const effectiveChildrenW = isMobile ? calcMobileChildrenWidth(viewport) : childrenW;
+  const effectiveChildrenW = isMobile
+    ? calcMobileChildrenWidth(viewport)
+    : childrenW;
+
   const desktopCols: 3 | 2 | 1 = (() => {
     if (!isMobile) return effectiveChildrenW >= MIN_1COL_CHILDREN ? 3 : 2;
     return effectiveChildrenW >= MIN_2COL_CHILDREN ? 2 : 1;
@@ -101,8 +88,10 @@ export default function HomePage() {
   };
 
   return (
-    <div className="flex flex-col min-h-full" style={{ opacity: isReady ? 1 : 0, transition: 'opacity 0.15s ease' }}>
-
+    <div
+      className="flex flex-col min-h-full"
+      style={{ opacity: isReady ? 1 : 0, transition: 'opacity 0.15s ease' }}
+    >
       {!isMobile && (
         <DashboardHeader onWidgetSettingClick={handleWidgetSettingClick} />
       )}
@@ -120,15 +109,14 @@ export default function HomePage() {
       <div
         className="flex flex-col gap-6"
         style={{
-          paddingTop: isMobile ? 20 : 40,
-          paddingLeft: isMobile ? 16 : 24,
-          paddingRight: isMobile ? 16 : 24,
+          paddingTop:    isMobile ? 20 : 40,
+          paddingLeft:   isMobile ? 16 : 24,
+          paddingRight:  isMobile ? 16 : 24,
           paddingBottom: isMobile ? 16 : 40,
           flex: 1,
           overflowY: 'auto',
         }}
       >
-        {/* KPI (POLICY §14: kpi ON일 때만 렌더 / POLICY §14-6: 하위 4종 개별 ON/OFF) */}
         {widgetVisibility.kpi && (
           <KpiCards
             isMobile={isMobile}
@@ -142,9 +130,22 @@ export default function HomePage() {
           />
         )}
 
-        {/* Phase 1: FeedWidget / IssueWidget / ClaimWidget 미포함 */}
+        <div
+          style={{
+            display:        'flex',
+            flexDirection:  'column',
+            alignItems:     'center',
+            justifyContent: 'center',
+            paddingTop:     60,
+            paddingBottom:  60,
+          }}
+        >
+          <span style={{ fontSize: 14, color: 'rgba(0,0,0,0.38)', textAlign: 'center' }}>
+            변경사항 피드·처리 필요·클레임 위젯은 Phase 2에서 제공됩니다.
+          </span>
+        </div>
       </div>
-
     </div>
   );
 }
+
