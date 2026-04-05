@@ -37,10 +37,22 @@ if [ "$PHASE" = "1" ]; then
   rm -f "$DST/src/components/dashboard/ClaimCard.tsx"
   echo "[OK] 위젯 파일 제거 완료"
 
-  # 2. page.tsx — Phase 1 전용 파일로 덮어쓰기 (sed 방식 대신 파일 복사)
-  cp "$SRC/src/app/(dashboard)/home/page.phase1.tsx" \
-     "$DST/src/app/(dashboard)/home/page.tsx"
-  echo "[OK] page.tsx Phase 1 전용 파일로 교체 완료"
+  # 2. page.tsx 전체 교체 (import + 렌더 코드 모두 제거)
+  PAGE="$DST/src/app/(dashboard)/home/page.tsx"
+  # singleColTab 상태 제거
+  sed -i '' "/const \[singleColTab/d" "$PAGE"
+  # import 제거
+  sed -i '' "/import { FeedWidget }/d" "$PAGE"
+  sed -i '' "/import { IssueWidget }/d" "$PAGE"
+  sed -i '' "/import { ClaimWidget }/d" "$PAGE"
+  # visibleTabs / effectiveSingleColTab 관련 라인 제거
+  sed -i '' "/visibleTabs/d" "$PAGE"
+  sed -i '' "/effectiveSingleColTab/d" "$PAGE"
+  # FeedWidget / IssueWidget / ClaimWidget 렌더 라인 제거
+  sed -i '' "/FeedWidget/d" "$PAGE"
+  sed -i '' "/IssueWidget/d" "$PAGE"
+  sed -i '' "/ClaimWidget/d" "$PAGE"
+  echo "[OK] page.tsx 위젯 코드 제거 완료"
 
   # 3. WidgetSelector.tsx — feed/issue/claim 기본값 false
   sed -i '' \
@@ -52,24 +64,6 @@ if [ "$PHASE" = "1" ]; then
   sed -i '' "s/next dev -p 9004/next dev -p 9006/" "$DST/package.json"
   sed -i '' "s/next start -p 9004/next start -p 9006/" "$DST/package.json"
   echo "[OK] package.json 포트 수정 완료 (9006)"
-
-  # 5. docs — 공개 대상 파일만 public/docs 로 복사, 나머지 전체 삭제
-  rm -rf "$DST/docs"
-  mkdir -p "$DST/public/docs"
-  cp "$SRC/docs/SPEC_AUTH.md"       "$DST/public/docs/"
-  cp "$SRC/docs/SPEC_KPI.md"        "$DST/public/docs/"
-  cp "$SRC/docs/SPEC_FEED.md"       "$DST/public/docs/"
-  cp "$SRC/docs/SPEC_ISSUE.md"      "$DST/public/docs/"
-  cp "$SRC/docs/SPEC_CLAIM.md"      "$DST/public/docs/"
-  cp "$SRC/docs/STATUS_POLICY.md"   "$DST/public/docs/"
-  cp "$SRC/docs/TERM_POLICY.md"     "$DST/public/docs/"
-  echo "[OK] 공개 문서 복사 완료 (public/docs)"
-
-  # 6. 내부 관리 문서 제거
-  rm -f "$DST/HANDOVER.md"
-  rm -f "$DST/HANDOVER_BASE.md"
-  rm -f "$DST/CLAUDE.md"
-  echo "[OK] 내부 관리 문서 제거 완료"
 fi
 
 echo ""
