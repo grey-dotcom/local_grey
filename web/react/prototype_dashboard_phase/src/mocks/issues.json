@@ -1,12 +1,18 @@
 {
   "_comment": "그레이 테스트 1 — 이슈 샘플 데이터",
-  "_policy": "지점별 미해결(≠COMPLETED) 건수 차별화: 강남점 3건 / 역삼점 1건 / 홍대점 2건 = 미해결 합계 6건",
-  "_issue_statuses": "RECEIVED(접수) → PENDING(대기) → CONFIRMED(확정) → COMPLETED(완료)",
+  "_policy": "지점별 미해결(≠RESOLVED) 건수 차별화: 강남점 3건 / 역삼점 1건 / 홍대점 2건 = 미해결 합계 6건",
+  "_issue_statuses": "REPORTED(접수) → RESOLVED(완료) / HOLD(보류) / CANCELED(취소)",
+  "_key_change_history": "68차: RECEIVED→REPORTED, PENDING→REPORTED, CONFIRMED→RESOLVED, COMPLETED→RESOLVED, ON_HOLD→HOLD / issueType: ON_HOLD→ETC",
+  "_completedAt_policy": {
+    "_comment": "completedAt 필드 — 달성률 분자(오늘 완료건) 계산용. 프로토타입 mock 전용.",
+    "_be_note": "[BE 개발자 참고] 실 서비스에서 BE는 resolvedAt 필드를 제공합니다. FE 연동 시 completedAt을 resolvedAt으로 교체하고 이 주석을 삭제하세요.",
+    "_role": "TODAY: _TODAY_T{HH:mm:ss} 형식 → KpiCards.tsx에서 오늘 날짜로 치환하여 isTodayDate 판단"
+  },
   "content": [
     {
       "issueId": "ISSU-W1-001",
       "issueType": "DAMAGE",
-      "issueStatus": "RECEIVED",
+      "issueStatus": "REPORTED",
       "isNew": true,
       "roomGroupId": "RG01XXXXXXXXXXXXXXXXXXXXXXXXXXX1",
       "roomGroupName": "강남점",
@@ -21,7 +27,7 @@
     {
       "issueId": "ISSU-W1-002",
       "issueType": "MALFUNCTION",
-      "issueStatus": "PENDING",
+      "issueStatus": "REPORTED",
       "isNew": true,
       "roomGroupId": "RG01XXXXXXXXXXXXXXXXXXXXXXXXXXX1",
       "roomGroupName": "강남점",
@@ -36,13 +42,15 @@
     {
       "issueId": "ISSU-W1-003",
       "issueType": "CONTAMINATION",
-      "issueStatus": "CONFIRMED",
+      "issueStatus": "RESOLVED",
       "isNew": false,
       "roomGroupId": "RG01XXXXXXXXXXXXXXXXXXXXXXXXXXX1",
       "roomGroupName": "강남점",
       "roomName": "2층 · 201호",
       "reporterName": "C 키퍼",
       "reportedAt": "2026-03-22T14:00:00",
+      "completedAt": "_TODAY_T10:00:00",
+      "_completedAt_role": "TODAY",
       "description": "침대 매트리스 하단 오염 발견. 전용 세제로 1차 처리했으나 완전 제거 안 됨. 교체 검토 필요.",
       "photoUrls": ["https://placehold.co/300x200/fff3e0/e65100?text=오염+이미지"],
       "processingComment": "전문 세탁 업체 일정 확인 중.",
@@ -51,7 +59,7 @@
     {
       "issueId": "ISSU-W1-004",
       "issueType": "SHORTAGE",
-      "issueStatus": "PENDING",
+      "issueStatus": "REPORTED",
       "isNew": true,
       "roomGroupId": "RG01XXXXXXXXXXXXXXXXXXXXXXXXXXX2",
       "roomGroupName": "역삼점",
@@ -66,7 +74,7 @@
     {
       "issueId": "ISSU-W1-005",
       "issueType": "DAMAGE",
-      "issueStatus": "RECEIVED",
+      "issueStatus": "REPORTED",
       "isNew": true,
       "roomGroupId": "RG01XXXXXXXXXXXXXXXXXXXXXXXXXXX3",
       "roomGroupName": "홍대점",
@@ -81,13 +89,15 @@
     {
       "issueId": "ISSU-W1-006",
       "issueType": "PROBLEM",
-      "issueStatus": "CONFIRMED",
+      "issueStatus": "RESOLVED",
       "isNew": false,
       "roomGroupId": "RG01XXXXXXXXXXXXXXXXXXXXXXXXXXX3",
       "roomGroupName": "홍대점",
       "roomName": "2층 · 207호",
       "reporterName": "O 키퍼",
       "reportedAt": "2026-03-23T11:30:00",
+      "completedAt": "_TODAY_T13:00:00",
+      "_completedAt_role": "TODAY",
       "description": "주방 세탁기 세제구 이상. 세제 투입 후 배출되지 않고 잔류. 세탁 완료 시 잔여 세제 누적.",
       "photoUrls": [],
       "processingComment": "기술팀 점검 일정 조율 중.",
@@ -96,7 +106,7 @@
     {
       "issueId": "ISSU-W1-007",
       "issueType": "SHORTAGE",
-      "issueStatus": "COMPLETED",
+      "issueStatus": "RESOLVED",
       "isNew": false,
       "roomGroupId": "RG01XXXXXXXXXXXXXXXXXXXXXXXXXXX1",
       "roomGroupName": "강남점",
@@ -111,10 +121,10 @@
       "scheduledDate": null
     },
     {
-      "_state": "ON_HOLD × 강남점 — 보류 탭 (feed.json W1-TCKT-020 이동)",
+      "_state": "HOLD × 강남점 — 보류 탭",
       "issueId": "ISSU-W1-008",
-      "issueType": "ON_HOLD",
-      "issueStatus": "ON_HOLD",
+      "issueType": "ETC",
+      "issueStatus": "HOLD",
       "isNew": false,
       "roomGroupId": "RG01XXXXXXXXXXXXXXXXXXXXXXXXXXX1",
       "roomGroupName": "강남점",
@@ -127,10 +137,10 @@
       "scheduledDate": null
     },
     {
-      "_state": "ON_HOLD × 홍대점 — 보류 탭 (feed.json W1-TCKT-021 이동)",
+      "_state": "HOLD × 홍대점 — 보류 탭",
       "issueId": "ISSU-W1-009",
-      "issueType": "ON_HOLD",
-      "issueStatus": "ON_HOLD",
+      "issueType": "ETC",
+      "issueStatus": "HOLD",
       "isNew": false,
       "roomGroupId": "RG01XXXXXXXXXXXXXXXXXXXXXXXXXXX3",
       "roomGroupName": "홍대점",

@@ -12,6 +12,10 @@
  *   feed_mock_w2        그레이 테스트 2 피드
  *   dashboard_mock_w1   그레이 테스트 1 KPI
  *   dashboard_mock_w2   그레이 테스트 2 KPI
+ *   feed_new_w1         그레이 테스트 1 isNew 세션 상태 (FeedWidget 관리, 66차 FE-R17)
+ *   feed_new_w2         그레이 테스트 2 isNew 세션 상태 (FeedWidget 관리, 66차 FE-R17)
+ *   issues_mock         이슈 목록 (워크스페이스 무관 단일 mock)
+ *   claims_mock         클레임 목록 (워크스페이스 무관 단일 mock)
  *
  * ─ dashboard.json 구조 ───────────────────────────────────────────────────
  *   {
@@ -204,6 +208,10 @@ export function saveMockClaims(data: ClaimReportsResponse): void {
   localStorage.setItem(CLAIMS_KEY, JSON.stringify(data));
 }
 
+// ── feed_new 키 목록 (FeedWidget.tsx getNewStorageKey와 동기화) ─────────────
+// feed_new_w1 / feed_new_w2 — isNew 세션 상태 저장 키 (66차 FE-R17)
+const FEED_NEW_KEYS = ['feed_new_w1', 'feed_new_w2'];
+
 /* ── 로그아웃 시 전체 초기화 — authStore.logout()에서 호출 ───────────────── */
 export function clearAllMockData(): void {
   if (typeof window === 'undefined') return;
@@ -211,6 +219,7 @@ export function clearAllMockData(): void {
     localStorage.removeItem(feed);
     localStorage.removeItem(dashboard);
   });
+  FEED_NEW_KEYS.forEach((key) => localStorage.removeItem(key));
   localStorage.removeItem(ISSUES_KEY);
   localStorage.removeItem(CLAIMS_KEY);
 }
@@ -218,6 +227,7 @@ export function clearAllMockData(): void {
 /** localStorage 키 전체 목록 (authStore에서 참조용) */
 export const MOCK_STORAGE_KEYS = [
   ...Object.values(WORKSPACE_KEY_MAP).flatMap(({ feed, dashboard }) => [feed, dashboard]),
+  ...FEED_NEW_KEYS,
   ISSUES_KEY,
   CLAIMS_KEY,
 ];

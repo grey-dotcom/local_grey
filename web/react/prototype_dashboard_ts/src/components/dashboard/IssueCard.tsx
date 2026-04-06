@@ -26,6 +26,10 @@
  * ─ 액션 버튼 (FeedCard ActionButton 패턴 이식) ────────────────────────────
  *   hover 상태, variant 시스템, 반응형 사이즈 — FeedCard와 동일
  *   상태변경 전 ConfirmModal 표시 — FeedCard와 동일 패턴
+ *
+ * ─ ConfirmModal confirmVariant (65차 신규) ────────────────────────────────
+ *   'error'   → 확인 버튼 #D32F2F (파괴적 액션: 완료처리·보류 등)
+ *   'primary' → 확인 버튼 #1976D2 (일반 상태 변경: 대기처리·확정 등)
  */
 
 'use client';
@@ -46,13 +50,14 @@ const ISSUE_TYPE_LABEL: Record<IssueType, string> = {
 // ── 상태 배지 ─────────────────────────────────────────────────────────────
 interface BadgeConfig { text: string; bg: string; color: string; icon?: 'check' }
 
+// ⚠️ 68차: RECEIVED→REPORTED, PENDING 제거, CONFIRMED→RESOLVED, COMPLETED→RESOLVED, ON_HOLD→HOLD
 function getStatusBadge(status: IssueReport['issueStatus']): BadgeConfig {
   switch (status) {
-    case 'RECEIVED':  return { text: '접수',  bg: '#E3F2FD', color: '#0D47A1' };
-    case 'PENDING':   return { text: '대기',  bg: '#EEEEEE', color: '#212121' };
-    case 'CONFIRMED': return { text: '확정',  bg: '#E8F5E9', color: '#1B5E20' };
-    case 'COMPLETED': return { text: '완료',  bg: '#E8F5E9', color: '#1B5E20', icon: 'check' };
-    default:          return { text: status,   bg: '#EEEEEE', color: '#212121' };
+    case 'REPORTED':  return { text: '접수됨', bg: '#E3F2FD', color: '#1565C0' };
+    case 'HOLD':      return { text: '보류',   bg: '#FEEBEE', color: '#FF1744' };
+    case 'RESOLVED':  return { text: '완료',   bg: '#E8F5E9', color: '#2E7D32', icon: 'check' };
+    case 'CANCELED':  return { text: '취소',   bg: '#F5F5F5', color: '#9E9E9E' };
+    default:          return { text: status,    bg: '#EEEEEE', color: '#212121' };
   }
 }
 
@@ -96,9 +101,17 @@ function ImageGrid({ urls }: { urls: string[] }) {
 }
 
 // ── 확인 팝업 (FeedCard ConfirmModal 패턴 이식) ─────────────────────────
-function ConfirmModal({ title, contents, onConfirm, onCancel }: {
-  title: string; contents?: string; onConfirm: () => void; onCancel: () => void;
+// confirmVariant (65차 신규):
+//   'error'   → 확인 버튼 #D32F2F — 파괴적 액션 (완료처리, 보류 등)
+//   'primary' → 확인 버튼 #1976D2 — 일반 상태 변경 (대기처리, 확정 등)
+function ConfirmModal({ title, contents, confirmVariant = 'primary', onConfirm, onCancel }: {
+  title: string;
+  contents?: string;
+  confirmVariant?: 'primary' | 'error';
+  onConfirm: () => void;
+  onCancel: () => void;
 }) {
+  const confirmBg = confirmVariant === 'error' ? '#D32F2F' : '#1976D2';
   return (
     <div
       style={{
@@ -137,7 +150,7 @@ function ConfirmModal({ title, contents, onConfirm, onCancel }: {
           }}>취소</button>
           <button type="button" onClick={onConfirm} style={{
             height: 36, paddingInline: 16,
-            background: '#1976D2', border: 'none',
+            background: confirmBg, border: 'none',
             borderRadius: 4, cursor: 'pointer',
             fontSize: 14, fontWeight: 500, fontFamily: 'inherit', color: 'white',
           }}>확인</button>
@@ -217,26 +230,38 @@ function StatusBadge({ badge, fontSize, isMobile }: { badge: BadgeConfig; fontSi
   );
 }
 
-// ── 상태별 액션 버튼 정의 (SVG 디자인 기준) ─────────────────────────────
+// ── 상태별 액션 버튼 정의 (67차 2단계 정책: 접수됨→완료/보류, 보류→재접수/취소) ────
+// ⚠️ 68차: RECEIVED→REPORTED, CONFIRMED→RESOLVED, ON_HOLD→HOLD
 function getNextAction(status: IssueReport['issueStatus']): { label: string; nextStatus: IssueReport['issueStatus'] } | null {
   switch (status) {
-    case 'RECEIVED':  return { label: '대기 처리', nextStatus: 'PENDING' };
-    case 'PENDING':   return { label: '확정',      nextStatus: 'CONFIRMED' };
-    case 'CONFIRMED': return { label: '완료 처리', nextStatus: 'COMPLETED' };
-    case 'COMPLETED': return null;
+    case 'REPORTED':  return { label: '완료', nextStatus: 'RESOLVED' };   // 운영자 확인 → 완료
+    case 'HOLD':      return { label: '재접수', nextStatus: 'REPORTED' }; // 보류 → 재접수
+    case 'RESOLVED':  return null; // 완료 → 액션 없음
+    case 'CANCELED':  return null; // 취소 → 액션 없음
     default:          return null;
   }
 }
 
-// ── 확인 팝업 스펙 ──────────────────────────────────────────────────────
-function getConfirmConfig(action: 'hold' | 'next', nextLabel: string): { title: string; contents?: string } {
+// ── 확인 팝업 스펙 (67차 2단계 정책 반영) ────────────────────────────────
+// ⚠️ 68차: 3단계→2단계 단순화. PENDING/CONFIRMED 제거.
+// hold(보류), cancelIssue(취소), next(완료/재접수) 3종
+type IssueConfirmType = 'hold' | 'cancelIssue' | 'next';
+
+function getConfirmConfig(action: IssueConfirmType, nextLabel: string): {
+  title: string;
+  contents?: string;
+  confirmVariant: 'primary' | 'error';
+} {
   if (action === 'hold') {
-    return { title: '선택하신 이슈를 보류 처리하시겠습니까?' };
+    return { title: '선택하신 이슈를 보류 처리하시겠습니까?', confirmVariant: 'error' };
   }
-  if (nextLabel === '완료 처리') {
-    return { title: '선택하신 이슈를 완료 처리하시겠습니까?', contents: '완료 처리된 이슈는 복구할 수 없습니다.' };
+  if (action === 'cancelIssue') {
+    return { title: '선택하신 이슈를 취소하시겠습니까?', contents: '취소된 이슈는 복구할 수 없습니다.', confirmVariant: 'error' };
   }
-  return { title: `선택하신 이슈를 ${nextLabel} 하시겠습니까?` };
+  if (nextLabel === '완료') {
+    return { title: '선택하신 이슈를 완료 처리하시겠습니까?', contents: '완료 처리된 이슈는 복구할 수 없습니다.', confirmVariant: 'error' };
+  }
+  return { title: `선택하신 이슈를 ${nextLabel} 처리하시겠습니까?`, confirmVariant: 'primary' };
 }
 
 // ── 메인 컴포넌트 ────────────────────────────────────────────────────────
@@ -249,10 +274,13 @@ interface IssueCardProps {
 
 export function IssueCard({ issue, isMobile = false, onDismissNew, onStatusChange }: IssueCardProps) {
   const [cardHovered, setCardHovered] = useState(false);
-  const [confirmType, setConfirmType] = useState<'hold' | 'next' | null>(null);
+  // ⚠️ 68차: 'hold' | 'cancelIssue' | 'next' 3종으로 변경
+  const [confirmType, setConfirmType] = useState<IssueConfirmType | null>(null);
 
   const statusBadge = getStatusBadge(issue.issueStatus);
-  const isCompleted = issue.issueStatus === 'COMPLETED';
+  const isCompleted = issue.issueStatus === 'RESOLVED';  // ⚠️ 68차: COMPLETED→RESOLVED
+  const isOnHold    = issue.issueStatus === 'HOLD';       // ⚠️ 68차: ON_HOLD→HOLD
+  const isCanceled  = issue.issueStatus === 'CANCELED';
   const nextAction  = getNextAction(issue.issueStatus);
 
   const handleDismissNew = () => {
@@ -261,7 +289,9 @@ export function IssueCard({ issue, isMobile = false, onDismissNew, onStatusChang
 
   const handleConfirm = () => {
     if (confirmType === 'hold') {
-      onStatusChange?.(issue.issueId, 'PENDING');
+      onStatusChange?.(issue.issueId, 'HOLD');        // ⚠️ 68차: ON_HOLD→HOLD
+    } else if (confirmType === 'cancelIssue') {
+      onStatusChange?.(issue.issueId, 'CANCELED');    // 취소 처리
     } else if (confirmType === 'next' && nextAction) {
       onStatusChange?.(issue.issueId, nextAction.nextStatus);
     }
@@ -284,11 +314,11 @@ export function IssueCard({ issue, isMobile = false, onDismissNew, onStatusChang
 
   return (
     <>
-      {/* 확인 팝업 — FeedCard ConfirmModal 패턴 */}
       {confirmType && confirmConfig && (
         <ConfirmModal
           title={confirmConfig.title}
           contents={confirmConfig.contents}
+          confirmVariant={confirmConfig.confirmVariant}
           onConfirm={handleConfirm}
           onCancel={() => setConfirmType(null)}
         />
@@ -314,7 +344,6 @@ export function IssueCard({ issue, isMobile = false, onDismissNew, onStatusChang
           transform: cardHovered ? 'translateY(-2px)' : 'none',
           cursor: 'default',
           minWidth: 0,
-          // maxWidth 없음 — FeedCard 37차 정책과 동일 (1열 우측 공백 방지)
           width: '100%',
           boxSizing: 'border-box',
         }}
@@ -324,17 +353,12 @@ export function IssueCard({ issue, isMobile = false, onDismissNew, onStatusChang
           <div style={{ width: 4, background: '#FF1744' }} />
         </div>
 
-        {/* 콘텐츠 영역 */}
         <div style={{ flex: '1 1 0', display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }}>
 
           {/* ── 배지 행 + 우측 버튼 ── */}
           <div style={{ opacity: isCompleted ? 0.4 : 1 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-              {/* 배지 영역: wrap 허용 — 배지 초과 시 두 줄 처리 (62차 FeedCard와 정책 통일)
-                   FeedCard 62차 수정 시 동일 원정책 적용: flexWrap:'wrap' + overflow:'visible'
-                   배지 개별 whiteSpace:nowrap + flexShrink:0 유지. */}
               <div style={{ flex: '1 1 0', display: 'flex', flexWrap: 'wrap', gap: isMobile ? 4 : 8, alignItems: 'center', minWidth: 0, overflow: 'visible' }}>
-                {/* NEW 배지 */}
                 {issue.isNew && (
                   <span style={{
                     height: 30, paddingInline: 8, paddingBlock: 4,
@@ -347,8 +371,6 @@ export function IssueCard({ issue, isMobile = false, onDismissNew, onStatusChang
                     NEW
                   </span>
                 )}
-
-                {/* COMPLETED: 상태배지 → 이슈타입배지 / 그 외: 이슈타입배지 → 상태배지 */}
                 {isCompleted ? (
                   <>
                     <StatusBadge badge={statusBadge} fontSize={fs.badge} isMobile={isMobile} />
@@ -362,7 +384,6 @@ export function IssueCard({ issue, isMobile = false, onDismissNew, onStatusChang
                 )}
               </div>
 
-              {/* 우측: 시간 + 구분선 + > 버튼 */}
               <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 4 : 8, flexShrink: 0 }}>
                 {!isMobile && (
                   <>
@@ -375,7 +396,6 @@ export function IssueCard({ issue, isMobile = false, onDismissNew, onStatusChang
                     <div style={{ height: 12, width: 0, borderLeft: '1px solid rgba(0,0,0,0.12)' }} />
                   </>
                 )}
-
                 <button type="button"
                   onClick={e => { e.stopPropagation(); handleDismissNew(); }}
                   style={{
@@ -395,17 +415,11 @@ export function IssueCard({ issue, isMobile = false, onDismissNew, onStatusChang
           {/* ── 보고자 + 위치 정보 ── */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, opacity: isCompleted ? 0.4 : 1 }}>
             <div style={{ display: 'flex', justifyContent: isMobile ? 'space-between' : 'flex-start', alignItems: 'center' }}>
-              <span style={{
-                color: 'rgba(0,0,0,0.87)', fontSize: fs.name, fontWeight: 700,
-                lineHeight: '28px', letterSpacing: '0.20px',
-              }}>
+              <span style={{ color: 'rgba(0,0,0,0.87)', fontSize: fs.name, fontWeight: 700, lineHeight: '28px', letterSpacing: '0.20px' }}>
                 {issue.reporterName}
               </span>
               {isMobile && (
-                <span style={{
-                  color: '#757575', fontSize: fs.time, fontWeight: 400,
-                  lineHeight: '19.92px', letterSpacing: '0.20px',
-                }}>
+                <span style={{ color: '#757575', fontSize: fs.time, fontWeight: 400, lineHeight: '19.92px', letterSpacing: '0.20px' }}>
                   {formatDateTime(issue.reportedAt)}
                 </span>
               )}
@@ -414,31 +428,21 @@ export function IssueCard({ issue, isMobile = false, onDismissNew, onStatusChang
               <svg width={16} height={16} viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
                 <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="black" />
               </svg>
-              <span style={{
-                color: 'rgba(0,0,0,0.87)', fontSize: fs.location, fontWeight: 700,
-                lineHeight: '20.02px', letterSpacing: '0.20px',
-              }}>
+              <span style={{ color: 'rgba(0,0,0,0.87)', fontSize: fs.location, fontWeight: 700, lineHeight: '20.02px', letterSpacing: '0.20px' }}>
                 {issue.roomGroupName}ㆍ{issue.roomName}
               </span>
             </div>
           </div>
 
-          {/* ── 설명 알림박스 — SVG: 모든 카드 #FEEBEE 박스 ── */}
-          <div style={{
-            padding: alertPadding,
-            background: '#FEEBEE', borderRadius: 8,
-            opacity: isCompleted ? 0.4 : 1,
-          }}>
+          {/* ── 설명 알림박스 ── */}
+          <div style={{ padding: alertPadding, background: '#FEEBEE', borderRadius: 8, opacity: isCompleted ? 0.4 : 1 }}>
             <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
               <div style={{ flexShrink: 0, marginTop: 1 }}>
                 <svg width={18} height={18} viewBox="0 0 24 24" fill="none">
                   <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" fill="#D50000" />
                 </svg>
               </div>
-              <div style={{
-                color: '#D50000', fontSize: fs.desc, fontWeight: 400,
-                lineHeight: '20.02px', letterSpacing: '0.20px',
-              }}>
+              <div style={{ color: '#D50000', fontSize: fs.desc, fontWeight: 400, lineHeight: '20.02px', letterSpacing: '0.20px' }}>
                 {issue.description}
               </div>
             </div>
@@ -451,65 +455,43 @@ export function IssueCard({ issue, isMobile = false, onDismissNew, onStatusChang
             </div>
           )}
 
-          {/* ── 처리 코멘트 (null이면 미노출) ── */}
+          {/* ── 처리 코멘트 ── */}
           {issue.processingComment && (
-            <div style={{
-              padding: '12px 16px', background: '#F5F5F5', borderRadius: 8,
-              outline: '1px #EEEEEE solid', outlineOffset: -1,
-              opacity: isCompleted ? 0.4 : 1,
-            }}>
-              <div style={{ fontSize: 11, color: 'rgba(0,0,0,0.38)', marginBottom: 4, letterSpacing: '0.3px' }}>
-                처리 코멘트
-              </div>
-              <div style={{
-                fontSize: 14, color: 'rgba(0,0,0,0.87)', fontWeight: 400,
-                lineHeight: '20px',
-              }}>
-                {issue.processingComment}
-              </div>
+            <div style={{ padding: '12px 16px', background: '#F5F5F5', borderRadius: 8, outline: '1px #EEEEEE solid', outlineOffset: -1, opacity: isCompleted ? 0.4 : 1 }}>
+              <div style={{ fontSize: 11, color: 'rgba(0,0,0,0.38)', marginBottom: 4, letterSpacing: '0.3px' }}>처리 코멘트</div>
+              <div style={{ fontSize: 14, color: 'rgba(0,0,0,0.87)', fontWeight: 400, lineHeight: '20px' }}>{issue.processingComment}</div>
             </div>
           )}
 
-          {/* ── 예정일 (null이면 미노출) ── */}
+          {/* ── 예정일 ── */}
           {issue.scheduledDate && (
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              opacity: isCompleted ? 0.4 : 1,
-            }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, opacity: isCompleted ? 0.4 : 1 }}>
               <svg width={16} height={16} viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
                 <path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM9 10H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2z" fill="#757575" />
               </svg>
-              <span style={{
-                color: '#757575', fontSize: 13, fontWeight: 400,
-                lineHeight: '18px', letterSpacing: '0.20px',
-              }}>
+              <span style={{ color: '#757575', fontSize: 13, fontWeight: 400, lineHeight: '18px', letterSpacing: '0.20px' }}>
                 처리 예정: {formatDateOnly(issue.scheduledDate)}
               </span>
             </div>
           )}
 
-          {/* ── 액션 버튼 (COMPLETED 제외) — FeedCard ActionButton 패턴 ── */}
-          {!isCompleted && nextAction && (
-            <div style={{
-              display: 'flex', justifyContent: 'flex-end', gap: 8,
-              paddingTop: 4,
-            }}>
-              {/* 보류 버튼 — RECEIVED/CONFIRMED 에서만 (PENDING은 이미 보류 상태) */}
-              {issue.issueStatus !== 'PENDING' && (
-                <IssueActionButton
-                  label="보류"
-                  variant="neutral-outlined"
-                  isMobile={isMobile}
-                  onClick={() => setConfirmType('hold')}
-                />
+          {/* ── 액션 버튼 (67차 2단계 정책) ── */}
+          {/* ⚠️ 68차: REPORTED→완료/보류, HOLD→재접수/취소, RESOLVED/CANCELED→버튼 없음 */}
+          {!isCompleted && !isCanceled && (
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, paddingTop: 4 }}>
+              {isOnHold ? (
+                // 보류 상태: 재접수 + 취소
+                <>
+                  <IssueActionButton label="취소" variant="neutral-outlined" isMobile={isMobile} onClick={() => setConfirmType('cancelIssue')} />
+                  <IssueActionButton label="재접수" variant="primary-contained" isMobile={isMobile} onClick={() => setConfirmType('next')} />
+                </>
+              ) : nextAction && (
+                // 접수됨 상태: 보류 + 완료
+                <>
+                  <IssueActionButton label="보류" variant="neutral-outlined" isMobile={isMobile} onClick={() => setConfirmType('hold')} />
+                  <IssueActionButton label={nextAction.label} variant="primary-contained" isMobile={isMobile} onClick={() => setConfirmType('next')} />
+                </>
               )}
-              {/* 다음 상태 버튼 */}
-              <IssueActionButton
-                label={nextAction.label}
-                variant="primary-contained"
-                isMobile={isMobile}
-                onClick={() => setConfirmType('next')}
-              />
             </div>
           )}
         </div>

@@ -1,5 +1,5 @@
 # 📋 prototype_dashboard_ts — 서비스 정책 문서
-> 작성일: 2026-03-19 | 최종 업데이트: 2026-03-27 (62차) | 이 문서는 각 세션에서 확정된 정책의 단일 참고 소스입니다.
+> 작성일: 2026-03-19 | 최종 업데이트: 2026-03-31 (71차) | 이 문서는 각 세션에서 확정된 정책의 단일 참고 소스입니다.
 > 코드 주석과 병행 관리 — 정책 변경 시 이 파일과 해당 파일 주석을 함께 수정할 것.
 
 ---
@@ -18,6 +18,8 @@
 | §12 | **피드 카드 액션 정책** (핵심 — Claude Code 필독) | FE / 디자인 / PM |
 | §13~14 | 위젯별 컨텐츠 정책 / KPI 집계 정책 | FE / PM |
 | §15 | KPI 확정 수치 (mock 기준) | PM / QA |
+| §18 | 65·66차 확정 정책 (배포·배지·ConfirmModal·탭카운트·버그수정) | FE / PM |
+| §19 | 67·68차 확정 정책 (상태값 전면 교체 — TicketStatus/IssueStatus/ClaimStatus) | FE / BE |
 
 > **Claude Code 개발자 필독**: §12 섹션(피드 카드 액션 정책)을 반드시 먼저 확인 후 구현을 시작할 것.
 > 미결 BE 항목(B1~B23)은 BE 응답 대기 중이며, Claude Code가 임의로 구현하지 않습니다.
@@ -189,7 +191,7 @@
 - 기본 선택 탭: `feed`
 
 #### ⚙️ FE 주의사항
-- 탭 카운트 현재 하드코딩(7/2/1) → Phase 3 완료 시 실제 카운트로 교체
+- 탭 카운트: 각 위젯 ALL 필터 기준 총 카드 수 (65차 실시간화 완료 — §18-4 참고)
 - 탭 전환 조건: `isSingleColumn || (isMobile && desktopCols===1)`
 - **웹(isMobile=false)에는 절대 탭 없음** — 코드 수정 시 반드시 확인
 
@@ -319,12 +321,10 @@
 > | 메모 남기기 | Phase 3 완료 + Phase 4(CRUD) 진입 시점에 제안 |
 
 ### 5-1. 미확인 건 찾기
-**기능 정의:** 3개 피드 레이아웃 전체에서 사용자가 아직 확인하지 않은 카드만 분류하는 필터 기능.
+**기능 정의 (65차 PM 확정):** 전체 위젯 중 NEW 배지가 붙은 카드만 필터링해서 노출하는 필터 기능.
 
-- **동작**: 토글 방식 (on → 미확인 카드만 / off → 전체 카드)
-- **배지**: 버튼에 미확인 건수 숫자 상시 노출
-- **확인 트리거**: 카드 내 명시적 "확인" 버튼 클릭 — **PM 확정 필요**
-- **적용 범위**: 3개 피드 레이아웃 모두 — **Phase 3 구현 시 확정**
+- **동작**: 토글 방식 (on → NEW 배지 카드만 / off → 전체 카드)
+- **현재 상태**: 미개발 — Phase 3 개발 시 진행
 - **아이콘**: SearchFilled (MUI)
 - **모바일**: 햄버거 드로어 내 리스트 항목
 
@@ -379,7 +379,7 @@
 - 지점 선택 변경 시 `activeTabGroupId` 자동 `null` 리셋 (authStore에서 처리)
 
 ### 5-3. 메모 남기기
-**⏸ 구현 보류 — Phase 3 완료 + Phase 4(CRUD) 진입 시점에 제안 예정**
+**⏸ 구현 보류 — 계정 인가 관련 세부 정책 확정 후 개발 (Phase 3+4 완료 시점)**
 
 ### 5-4. 위젯 설정
 **⏸ 구현 보류 — Phase 3 완료 + PM 저장 위치 확정 후 제안 예정**
@@ -535,7 +535,9 @@ Phase 4  CRUD (사진·텍스트)
 | FE | IssueWidget Phase 3 카드 구현 | 🔴 높음 |
 | FE | ClaimWidget Phase 3 카드 구현 | 🔴 높음 |
 | FE | KpiBoard.tsx 삭제 (KpiCards.tsx로 완전 교체) | 🟡 중간 |
-| FE | issues/claims mock — W2 별도 파일 분리 필요 | 🟡 중간 |
+| FE | FE-R5: KpiCards any 타입 → IssueReport[]/ClaimReport[] 교체 | 🟡 중간 |
+| FE | FE-R6: applyTodayDueAt 중복 구현 → 공통 유틸 분리 | 🟡 중간 |
+| FE | FE-R7: desktopCols 반응형 탭 전환 분기 누락 | 🟡 중간 |
 | BE | TicketStatus 8단계 확장 — BE와 최종 협의 필요 | 🔴 높음 |
 | BE | keeperName / keeperPhone 프로토타입 확장 필드 — BE 제공 여부 확인 | 🔴 높음 |
 | BE | photoUrls → PhotoSource[] 전환 — BE 연동 시 처리 | 🟡 중간 |
@@ -549,8 +551,10 @@ Phase 4  CRUD (사진·텍스트)
 | BE | **[강제완료] 강제완료 처리 API — 엔드포인트, HTTP method, payload 확인** | 🔴 높음 |
 | BE | **[긴급변경] 키퍼 수락 상태 구분 필드 — TicketStatus 확장 또는 별도 필드 여부** | 🔴 높음 |
 | BE | **[긴급/완료] 처리 후 앱 내 카드 노출/삭제 — BE 응답 이벤트 구조 확인** | 🔴 높음 |
+| BE | alertMessages 필드명 확정 (B14·B15) | 🔴 높음 |
 | PM | 위젯 설정 저장 위치 (서버 vs 로컬) | 높음 |
 | PM | 미확인 건 확인 트리거 (열람 vs 클릭) | 높음 |
+| PM | 세그먼트 탭 카운트 기준 — ALL vs 미처리만 (현재 ALL) | 🟡 중간 |
 | FE | Pretendard 폰트 CDN vs 로컬 | 낮음 |
 | Design | GNBSidebar 아이콘 gap/구분선 최종 확인 | 중간 |
 | UX | #1976D2 vs #2962FF 색상 토큰 통일 | 중간 |
@@ -563,18 +567,23 @@ Phase 4  CRUD (사진·텍스트)
 > **용도**: Claude Code가 BE 연동 시 프로토타입 타입과 BE 실제 키를 대조하는 기준
 > **파일**: `src/types/dashboard.ts` 주석에도 동일 내용 병기됨
 
-### 9-1. TicketStatus 매핑
+### 9-1. TicketStatus 코드 키 (68차 교체 완료 — 코드 = BE 원본)
 
-| 프로토타입 | BE 원본 | 설명 |
+> **68챂 클드 코드는 BE 원본 키로 완전 대체되었습니다.** 어다터는 `프로토타입↔BE` 음포매핑이 필요하지 않습니다.
+> 구 키 매핑 정보는 `docs/STATUS_POLICY.md §12-2` 보관 참조.
+
+| 코드 키 (to-be, 현재 코드) | 한글 | 비고 |
 |---|---|---|
-| `REPORTED` | (확장) | 보고됨 — BE PENDING 이전 단계, 협의 필요 |
-| `UNASSIGNED` | `PENDING` | 미배정 |
-| `ASSIGNED` | `ASSIGNED` | 배정됨 ✅ |
-| `BEFORE_START` | `RESERVED` | 수행전 |
-| `IN_PROGRESS` | `STARTED` | 수행중 |
-| `COMPLETED` | `RESOLVED` | 완료 |
-| `ON_HOLD` | (확장) | 보류 — BE 미존재, 협의 필요. 진행 중 클레임 등으로 일시 중단된 건. 재개 가능성 있음 (59차 정의 추가) |
-| `CANCELLED` | `CANCELED` | 취소 (철자 주의: BE는 CANCELED) |
+| `REPORTED` | 보고됨 | 구: REPORTED 유지 |
+| `PENDING` | 미배정 | 구: UNASSIGNED |
+| `ASSIGNED` | 배정됨 | 유지 |
+| `RESERVED` | 수행전 | 구: BEFORE_START |
+| `STARTED` | 수행중 | 구: IN_PROGRESS |
+| `HOLD` | 보류 | 구: ON_HOLD |
+| `RESOLVED` | 완료 | 구: COMPLETED |
+| `CANCELED` | 취소 | 구: CANCELLED (철자 D 1개로 동일) |
+
+**BE 연동 시 참고:** 코드는 BE 원본 키와 일치하며, 필드명 매핑은 §9-2 참조.
 
 ### 9-2. TicketReport 필드 매핑 (BE: TicketThumbnail)
 
@@ -851,7 +860,7 @@ BE 연동 시 클레임 전용 API 경로 및 응답 구조 별도 확인 필요
 | 배지 `flexShrink` | **`0`** | 배지 너비 유지 |
 
 > **노출 순서**: NEW 배지 → 상태 배지 → 업무형태 배지 순서. 컨테이너가 춥아지면 업무형태 배지가 잠슬 수 있으나, 이는 의도된 동작입니다.
-> **FE 주의사항** (62차 수정): `FeedCard.tsx` / `IssueCard.tsx` 상태배지 컴테이너에 `flexWrap: 'wrap'` + `overflow: 'visible'` 적용. 배지 개별에는 `whiteSpace: 'nowrap'` + `flexShrink: 0` 유지. `nowrap`으로 되돌리면 우측 시간 영역 침범 버그 재발.
+> **FE 주의사항** (65차 통일): `FeedCard.tsx` / `IssueCard.tsx` / `ClaimCard.tsx` 상태배지 컨테이너 모두 `flexWrap: 'wrap'` + `overflow: 'visible'` 적용. 배지 개별에는 `whiteSpace: 'nowrap'` + `flexShrink: 0` 유지. `nowrap`으로 되돌리면 우측 시간 영역 침범 버그 재발.
 
 ---
 
@@ -1415,43 +1424,58 @@ export function applyWidgetToggle(prev: WidgetVisibility, key: keyof WidgetVisib
 
 ---
 
-## 15. KPI 숫자 정책 (60차 PM 확정)
+## 15. KPI 숫자 정책 (69차 수정 완료)
 
 > KpiCards.tsx 집계 로직 기준. 코드 수정 시 이 섹션 필수 확인.
+> **69차 확정 수치**: 업무현황 17건 / 미해결이슈 6건 / 미확인클레임 3건 / 달성률 15/44건(34%)
 
 ### 15-1. 업무 현황 (taskCount)
 
-**61차 PM 확정 수치: 17건** (feed.json 27건 전체 - 완료7 - 취소3 = 17)
+**69차 확정 수치: 17건** (PENDING 3 + ASSIGNED 5 + RESERVED 4 + STARTED 5)
 
 | 티켓 상태 | 포함 | 이유 |
 |---|---|---|
-| UNASSIGNED~IN_PROGRESS | 포함 | 진행 대상 업무 (REPORTED 제외 — issueticket으로 분리됨) |
-| ON_HOLD | 제외 | 61차 개정 — 처리필요 위젯 보류 탭으로 이동 |
-| COMPLETED | 제외 | 완료됨 |
-| CANCELLED | 제외 | 취소된 건은 업무 대상 아님 |
+| PENDING | 포함 | 미배정 상태 — 처리 대기 중 |
+| ASSIGNED | 포함 | 배정됨 — 수행 예정 |
+| RESERVED | 포함 | 수행전 — 시작 대기 중 |
+| STARTED | 포함 | 수행중 — 처리 진행 중 |
+| REPORTED | 제외 | 보고됨 — issueticket으로 분리됨 |
+| HOLD | 제외 | 보류 — 처리필요 위젯 보류 탭으로 분리됨 |
+| RESOLVED | 제외 | 완료됨 |
+| CANCELED | 제외 | 취소된 건은 업무 대상 아님 |
 
-### 15-2. 오늘 업무 달성률 (rate) — 61차 개정
+> **집계 조건 (69차 교체)**: `ticketStatus === 'PENDING' || ticketStatus === 'ASSIGNED' || ticketStatus === 'RESERVED' || ticketStatus === 'STARTED'`
+> 이전 조건(`!== RESOLVED && !== CANCELED`)은 REPORTED·HOLD가 포함되는 버그가 있었으므로 명시적 열거 방식으로 교체.
 
-- 분모(total): 피드(CANCELLED 제외) + 이슈 전체 + 클레임 전체
-- 분자(completed): 피드 COMPLETED + 이슈 오늘 완료 + 클레임 오늘 완료
+### 15-2. 오늘 업무 달성률 (rate) — 69차 수정
+
+- **분모(total)**: 피드 전체(27건) + 이슈 전체(9건) + 이슈HOLD 별도(2건) + 클레임 전체(6건) = **44건**
+- **분자(completed)**: 피드 오늘 RESOLVED+CANCELED(10건) + 이슈 오늘 RESOLVED(3건) + 클레임 오늘 ACCEPTED+DISPUTE_COMPLETED(2건) = **15건**
+- **달성률**: 15/44 = **34%**
 - 이슈·클레임 완료 기준: `completedAt` 오늘 날짜 해당 건만 분자 포함 (D+1 00:00 리셋)
-- 예) 피드 24 + 이슈 7 + 클레임 4 = 분모 35, 분자 9 → **26%**
-- ⚠️ 프로토타입: issues.json·claims.json의 COMPLETED 건에 `completedAt: "_TODAY_T.."` 플레이스홀더 도입, KpiCards.tsx에서 오늘 날짜로 대체 후 판단
+
+> **분모 보류 별도 카운트**: 이슈 HOLD 2건은 issueTotal(9건)과 별도로 holdTotal로 추가 집계. 이는 보류 이슈가 달성률 분모에 포함되어야 하지만 issueTotal에 이미 포함된 건과 중복되지 않도록 하기 위함.
+>
+> **클레임 분자 조건 (69차 교체)**: 이전 `=== 'COMPLETED'`(존재하지 않는 키)는 `=== 'ACCEPTED' || === 'DISPUTE_COMPLETED'`로 교체 완료.
+>
+> **completedAt 필드 주석**: `completedAt`은 **mock 전용 필드**. BE 연동 시 `resolvedAt`(완료) / `canceledAt`(취소)으로 교체하고 해당 주석을 삭제할 것. (issues.json·claims.json도 동일)
 
 ### 15-3. 미해결 이슈 (issueCount)
 
-**61차 PM 확정 수치: 8건** (issueticket 미완료 6건 + ON_HOLD 보류 2건)
+**69차 확정 수치: 6건** (REPORTED 4건 + HOLD 2건)
 
-- `issueStatus !== 'COMPLETED'` (RECEIVED·PENDING·CONFIRMED + ON_HOLD 모두 포함)
-- ON_HOLD는 취소가 아닌 재개 가능한 보류 상태 → 미해결로 집계
+- 집계 조건: `issueStatus === 'REPORTED' || issueStatus === 'HOLD'`
+- REPORTED(접수됨): 아직 처리되지 않은 이슈
+- HOLD(보류): 취소가 아닌 재개 가능한 보류 상태 → 미해결로 집계
 
 ### 15-4. 미확인 클레임 (claimCount)
 
-**61차 PM 확정 수치: 3건** (PENDING만)
+**69차 확정 수치: 3건** (PENDING 3건)
 
-- `claimStatus === 'PENDING'` 만 (ON_HOLD 제외)
+- 집계 조건: `claimStatus === 'PENDING'`
+- ACCEPTED·DISPUTED·DISPUTE_COMPLETED는 처리됨으로 간주하여 제외
 
-> **BE 참고:** 실서비스 전환 시 KPI 전용 엔드포인트 필요. CANCELLED 제외 로직은 API 파라미터(`status!=CANCELLED`)로 처리 권장.
+> **BE 참고:** 실서비스 전환 시 KPI 전용 엔드포인트 필요. 조건은 API 파라미터(`status=PENDING`)로 처리 권장.
 
 ### 15-5. mock dueAt 동적 계산 정책 (62차 확정 — 프로토타입 전용)
 
@@ -1582,3 +1606,178 @@ tickert이 발급되지 않은 클레임 → 업무 현황 미포함.
 > 4. 루프 진행 (PM·디자이너·FE·BE 동시 검토)
 > 5. 합의 후 정책서 작성
 > 6. POLICY.md 업데이트 후 HANDOVER 업데이트
+
+
+---
+
+## 18. 65·66차 확정 정책 (2026-03-30)
+
+> 65·66차 코드리뷰 루프 + 수정 작업에서 확정된 정책들입니다.
+
+### 18-1. 배포 정책 (65차 확정)
+
+| 항목 | 값 |
+|---|---|
+| 로컬 개발 경로 | `/Users/grey/Desktop/local_grey/web/react/prototype_dashboard_ts` |
+| Vercel 배포 경로 | `/Users/grey/Desktop/local_grey/web/react/prototype_dashboard_phase` |
+| git repo | `github.com/grey-dotcom/local_grey` (`dev` 브랜치) |
+| Vercel Root Directory | `web/react/prototype_dashboard_phase` |
+| Vercel URL | `https://prototype-dashboard-ten.vercel.app/` |
+| 배포 방법 | `local_grey` 루트에서 `git add/commit/push origin dev` |
+
+- `prototype_dashboard_ts`(dev)는 Vercel 빌드 대상 아님 — 절대 수정 금지
+- `prototype_dashboard_phase`의 파일 수정 후 `dev` 브랜치에 push하면 Vercel 자동 재배포
+
+### 18-2. 배지 정책 통일 (65차 확정)
+
+FeedCard·IssueCard·ClaimCard 배지 행 정책 통일:
+- `flexWrap: wrap` + `overflow: visible` 적용 (62차 기준)
+- 배지 개별: `whiteSpace: nowrap` + `flexShrink: 0` 유지
+- ClaimCard: 59차 `nowrap+hidden` → 65차에서 62차 최신 정책으로 업데이트
+
+### 18-3. ConfirmModal confirmVariant 정책 (65차 확정)
+
+| 액션 유형 | confirmVariant | 확인 버튼 색상 |
+|---|---|---|
+| 파괴적 액션 (완료처리·취소·보류) | `error` | `#D32F2F` |
+| 일반 상태 변경 (대기처리·확정 등) | `primary` | `#1976D2` |
+
+- 적용 파일: `IssueCard.tsx`, `ClaimCard.tsx`
+- `FeedCard.tsx`: 향후 동일 정책 적용 예정 (현재는 기존 방식 유지)
+
+**IssueCard 팝업별 variant:**
+- 보류 → `error`
+- 완료 처리 → `error`
+- 대기 처리 → `primary`
+- 확정 → `primary`
+
+**ClaimCard 팝업별 variant:**
+- 완료 처리 → `error`
+
+### 18-4. 세그먼트 탭 카운트 정책 (65차 확정)
+
+- 1열 모바일 세그먼트 탭의 카운트 = 각 위젯 ALL 필터 기준 총 카드 수
+- 하드코딩(7/2/1) 제거 → 실시간 state로 교체 완료 (65차)
+- 구현: `FeedWidget`/`IssueWidget`/`ClaimWidget`에 `onCountChange?: (count: number) => void` prop 추가
+- `page.tsx`에서 `feedCount`/`issueCount`/`claimCount` state로 실시간 수신
+- `useCallback`으로 memoize → 불필요한 리렌더 방지
+
+### 18-5. 미확인 건 찾기 기능 정의 (65차 PM 확정)
+
+- **기능 정의**: 전체 위젯 중 NEW 배지가 붙은 카드만 필터링해서 노출하는 필터 기능
+- **현재 상태**: 미개발 (향후 작업 리스트 등록)
+- **구현 시점**: Phase 3 개발 시 진행
+
+### 18-6. 메모 남기기 정책 (65차 PM 확정)
+
+- **현재 상태**: 미개발
+- **구현 조건**: 계정 인가 관련 세부 정책 확정 후 개발
+- **구현 시점**: Phase 3+4 완료 후
+
+### 18-7. POLICY.md 수정 규칙 (65차 교훈 — 절대 준수)
+
+**원인**: POLICY.md 헤더 수정 시 `write_file`에 2줄만 담아 파일 전체 초기화 (65차 사고)
+**규칙**: POLICY.md 수정 시 반드시 기존 전체 내용을 read 후 원하는 부분만 변경하여 write_file
+- edit_file 시도 → 실패 시 전체 read → 변경분 포함하여 write_file
+- 절대로 부분 내용만 담아 write_file 금지
+
+### 18-8. 추가 작업 리스트 (65·66차 기준)
+
+**FE 코드 수정 (완료/잔여):**
+| ID | 내용 | 상태 |
+|---|---|---|
+| ~~FE-R4~~ | ~~IssueCard ON_HOLD 배지 추가~~ | ✅ 66차 완료 |
+| FE-R5 | KpiCards `any` 타입 → `IssueReport[]`/`ClaimReport[]` 타입으로 교체 | 향후 |
+| FE-R6 | `applyTodayDueAt` 중복 구현(FeedWidget/KpiCards) → 공통 유틸로 분리 | 향후 |
+| ~~FE-R7~~ | ~~`desktopCols` 반응형 탭 전환 분기 누락 → `page.tsx` 수정 필요~~ | ✅ 69차 확인 완료 — 구현 기확인 |
+| ~~FE-R17~~ | ~~`mockStore.clearAllMockData`에서 `feed_new_*` 키 누락~~ | ✅ 66차 완료 |
+
+**BE 실 서비스 연동 시 필수:**
+- `TicketStatus` 프로토타입↔BE 매핑 테이블 문서화 (§9-1 보완)
+- `photoUrls` → `PhotoSource[]` 전환 (§9-3 참고)
+- `alertMessages` 필드명 BE 확정 (B14·B15)
+
+**PM 정책 결정 필요:**
+- IssueCard ON_HOLD 다음 액션 (처리필요 개발 시)
+- 세그먼트 탭 카운트 기준 — ALL vs 미처리만 (현재 ALL로 구현)
+
+### 18-9. 66차 확인 및 수정 내용 (2026-03-30)
+
+#### FeedCard 버그 B — mock 데이터 수정
+- **버그**: `W1-TCKT-019`(SVG8 케이스 의도)의 feedbackText가 텍스트를 보유해 SVG9(메모 있음)처럼 읽기 전용 박스가 노출됨
+- **해결**: `W1-TCKT-019` feedbackText → `null`로 수정. SVG8(메모 없음) 케이스 검수 정상화.
+- **파일**: `src/mocks/feed.json`
+
+#### FeedCard 버그 C — opacity 조건 불일치
+- **버그**: 키퍼명+위치 행 opacity 조건에 `wasDelayedBeforeComplete` 체크 누락 → 완료+지연 카드에서 헤더 opacity 1 vs 키퍼명 행 opacity 0.4 불일치
+- **해결**: `isCompleted && !delayUrgent ? 0.4 : 1` → `isCompleted && !delayUrgent && !wasDelayedBeforeComplete(ticket.dueAt) ? 0.4 : 1`
+- **파일**: `FeedCard.tsx`
+
+#### mockStore.ts 헤더 주석 보완
+- **내용**: 파일 헤더 localStorage 키 목록에 `feed_new_w1 / feed_new_w2` 및 `issues_mock / claims_mock` 추가
+- **파일**: `src/utils/mockStore.ts`
+
+#### IssueCard ON_HOLD 배지 정책 (66차 확정)
+- `getStatusBadge`에 `ON_HOLD → 보류 (bg #FEEBEE / color #FF1744)` 케이스 추가
+- `isOnHold` 상태에서 액션 버튼 미노출 (`!isCompleted && !isOnHold && nextAction` 조건)
+- ClaimCard에 ON_HOLD 없음: 의도된 설계. ClaimReport는 `PENDING`/`COMPLETED`만 정의.
+- **파일**: `IssueCard.tsx`
+
+---
+
+## 19. 67·68차 확정 정책 (2026-03-30~31) — 상태값 전면 재정의
+
+> 상세 내용: `docs/STATUS_POLICY.md` 전체 참조.
+
+### 19-1. 배경
+
+67차 세션에서 BE 개발서버(`indicator.test.11h.kr`) 실측을 통해 프로토타입의 상태값 키가 BE 원본과 대규모 불일치하는 것을 확인. 완전 대체 방식으로 통일 확정. 68차에 코드 교체 완료.
+
+### 19-2. TicketStatus 키 완전 교체 확정 (68차 완료)
+
+| 교체 전 (구) | 교체 후 (현재 코드) | 한글 |
+|---|---|---|
+| `UNASSIGNED` | `PENDING` | 미배정 |
+| `BEFORE_START` | `RESERVED` | 수행전 |
+| `IN_PROGRESS` | `STARTED` | 수행중 |
+| `COMPLETED` | `RESOLVED` | 완료 |
+| `CANCELLED` | `CANCELED` | 취소 |
+| `ON_HOLD` | `HOLD` | 보류 |
+| `REPORTED` | `REPORTED` | 보고됨 (유지) |
+| `ASSIGNED` | `ASSIGNED` | 배정됨 (유지) |
+
+### 19-3. IssueStatus 재정의 — TicketReportStatus 채택
+
+IssueWidget은 BE의 `TicketReportStatus` enum을 기준으로 함 (BE 실측 확인).
+
+| 교체 전 (구) | 교체 후 (현재 코드) | 한글 |
+|---|---|---|
+| `RECEIVED` | `REPORTED` | 접수됨 |
+| `PENDING` | — 제거 | 이슈 상태에 없음 |
+| `CONFIRMED` | `RESOLVED` | 완료(확인) |
+| `ON_HOLD` | `HOLD` | 보류 |
+| — | `CANCELED` | 취소 (신규 추가) |
+
+IssueCard 버튼 흐름: **접수(REPORTED) → 완료(RESOLVED) / 보류(HOLD)** (3단계 → 2단계 단순화)
+
+### 19-4. ClaimStatus 확장 (68차)
+
+`PENDING`(처리 대기) / `ACCEPTED`(인정완료) / `DISPUTED`(이의제기) / `DISPUTE_COMPLETED`(이의제기완료) 4종.
+
+⚠️ `ACCEPTED`·`DISPUTED`·`DISPUTE_COMPLETED` BE 키 미확정 — BE `/shared/v1/ticket-claim-statuses` 실측 후 교체 필요.
+
+### 19-5. 위젯별 enum 채택 기준
+
+| 위젯 | enum | 분류 |
+|---|---|---|
+| FeedWidget | `TicketStatus` | BE `/shared/v1/ticket-statuses` |
+| IssueWidget | `IssueStatus` (= `TicketReportStatus`) | BE `/shared/v1/ticket-report-statuses` |
+| ClaimWidget | `ClaimStatus` | 4종 확장 (BE 키 미확정 포함) |
+
+### 19-6. dashboard.ts 수정 권한 (67차~)
+
+`src/types/dashboard.ts`: Claude Desktop 수정 가능 (상태값 키 교체 작업 한정). Claude Code 수정 금지 유지.
+
+### 19-7. 개발자 피드백 대응 기록 (68차)
+
+개발자단의 "BEFORE_START 등 상태값이 없다", "이슈 대기 없다", "클레임 2종 아니다" 피드백은 67·68차 작업 **이전 코드**를 기준으로 한 것. 68차에서 BE 원본 키로 전면 교체 완료됨. 상세: `docs/STATUS_POLICY.md §9`.

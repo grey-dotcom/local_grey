@@ -1,8 +1,14 @@
 {
   "_comment": "그레이 테스트 1 — 피드 샘플 데이터",
-  "_policy": "61차 기준 — REPORTED(issueticket) + ON_HOLD(처리필요 위젯) 제거 후 UNASSIGNED~CANCELLED 구성",
-  "_status_count": "UNASSIGNED:3 / ASSIGNED:5 / BEFORE_START:4 / IN_PROGRESS:5 / COMPLETED:7 / CANCELLED:3 (61차, 총 27건)",
-  "_removed": "REPORTED 4건(001/002/003/027) → issues.json issueticket으로 이동 / ON_HOLD 2건(020/021) → 처리필요 위젯 보류 탭으로 이동",
+  "_policy": "68차 상태값 교체 — BE 원본 키 기준. PENDING:3 / ASSIGNED:5 / RESERVED:4 / STARTED:5 / RESOLVED:7 / CANCELED:3 (총 27건)",
+  "_status_count": "PENDING:3 / ASSIGNED:5 / RESERVED:4 / STARTED:5 / RESOLVED:7 / CANCELED:3 (68차, 총 27건)",
+  "_removed": "REPORTED 4건(001/002/003/027) → issues.json issueticket으로 이동 / HOLD 2건(020/021) → 처리필요 위젯 보류 탭으로 이동",
+  "_key_change_history": "67차: UNASSIGNED→PENDING, BEFORE_START→RESERVED, IN_PROGRESS→STARTED, COMPLETED→RESOLVED, CANCELLED→CANCELED, ON_HOLD→HOLD",
+  "_completedAt_policy": {
+    "_comment": "completedAt 필드 — 달성률 분자(오늘 완료건) 계산용. 프로토타입 mock 전용.",
+    "_be_note": "[BE 개발자 참고] 실 서비스에서 BE는 resolvedAt(완료) / canceledAt(취소) 필드를 별도로 제공합니다. FE 연동 시 completedAt을 resolvedAt 또는 canceledAt으로 교체하고 이 주석을 삭제하세요.",
+    "_role": "TODAY: _TODAY_T{HH:mm:ss} 형식 → KpiCards.tsx에서 오늘 날짜로 치환하여 isTodayDate 판단"
+  },
   "_alert_messages_policy": {
     "_comment": "alertMessages 필드는 알림박스 우선순위 정책 (45차 확정) 적용 대상입니다.",
     "_priority": "1위: alertMessages 배열 중 registeredAt 최신 1건 노출 / 2위: 배열 없거나 비면 마감시간 안내",
@@ -22,18 +28,18 @@
     "PAST":   "오늘 날짜 + 원본 시각(이미 지난 시각) → 지연 카드",
     "URGENT": "오늘 NOW + _urgentOffsetMin분 후 → 임박 카드",
     "NORMAL": "NOW + _normalOffsetMin분 후(기본 90분) → 정상 카드 — 항상 현재 시각 기준 미래 보장 (62차 근본 수정)",
-    "없음":   "COMPLETED/CANCELLED 등 — 원본 그대로"
+    "없음":   "RESOLVED/CANCELED 등 — 원본 그대로"
   },
   "content": [
 
     {
-      "_state": "UNASSIGNED × 강남점 — 임박 확인용 (SVG 2: OPERATOR 알럿 + isUrgent=true)",
+      "_state": "PENDING × 강남점 — 임박 확인용 (SVG 2: OPERATOR 알럿 + isUrgent=true)",
       "_dueAt_role": "URGENT",
       "_scheduledAt_role": "TODAY",
       "_urgentOffsetMin": 20,
       "_alert_case": "SVG2 — isUrgent=true 임박 카드, OPERATOR 알럿 노출",
       "ticketId": "W1-TCKT-004",
-      "ticketStatus": "UNASSIGNED",
+      "ticketStatus": "PENDING",
       "isNew": true,
       "isUrgent": true,
       "taskType": "스튜디오 퇴실청소",
@@ -55,11 +61,11 @@
       ]
     },
     {
-      "_state": "UNASSIGNED × 역삼점 — 정상",
+      "_state": "PENDING × 역삼점 — 정상",
       "_dueAt_role": "NORMAL",
       "_scheduledAt_role": "TODAY",
       "ticketId": "W1-TCKT-005",
-      "ticketStatus": "UNASSIGNED",
+      "ticketStatus": "PENDING",
       "isNew": false,
       "isUrgent": false,
       "taskType": "스튜디오 테라스 퇴실청소",
@@ -74,11 +80,11 @@
       "feedbackText": null
     },
     {
-      "_state": "UNASSIGNED × 홍대점 — 정상",
+      "_state": "PENDING × 홍대점 — 정상",
       "_dueAt_role": "NORMAL",
       "_scheduledAt_role": "TODAY",
       "ticketId": "W1-TCKT-006",
-      "ticketStatus": "UNASSIGNED",
+      "ticketStatus": "PENDING",
       "isNew": true,
       "isUrgent": false,
       "taskType": "비품 보충",
@@ -152,11 +158,11 @@
     },
 
     {
-      "_state": "BEFORE_START × 강남점 — 정상",
+      "_state": "RESERVED × 강남점 — 정상",
       "_dueAt_role": "NORMAL",
       "_scheduledAt_role": "TODAY",
       "ticketId": "W1-TCKT-010",
-      "ticketStatus": "BEFORE_START",
+      "ticketStatus": "RESERVED",
       "isNew": false,
       "isUrgent": false,
       "taskType": "스튜디오 정규청소",
@@ -171,11 +177,11 @@
       "feedbackText": null
     },
     {
-      "_state": "BEFORE_START × 역삼점 — 정상",
+      "_state": "RESERVED × 역삼점 — 정상",
       "_dueAt_role": "NORMAL",
       "_scheduledAt_role": "TODAY",
       "ticketId": "W1-TCKT-011",
-      "ticketStatus": "BEFORE_START",
+      "ticketStatus": "RESERVED",
       "isNew": false,
       "isUrgent": false,
       "taskType": "스튜디오 퇴실청소",
@@ -191,13 +197,13 @@
     },
 
     {
-      "_state": "IN_PROGRESS × 강남점 — 임박 (SVG 3: 완료 단독)",
+      "_state": "STARTED × 강남점 — 임박 (SVG 3: 완료 단독)",
       "_dueAt_role": "URGENT",
       "_scheduledAt_role": "TODAY",
       "_urgentOffsetMin": 15,
-      "_alert_case": "SVG3 — IN_PROGRESS 임박 카드, alertMessages 없음 → 마감시간 안내(2위) 노출",
+      "_alert_case": "SVG3 — STARTED 임박 카드, alertMessages 없음 → 마감시간 안내(2위) 노출",
       "ticketId": "W1-TCKT-012A",
-      "ticketStatus": "IN_PROGRESS",
+      "ticketStatus": "STARTED",
       "isNew": false,
       "isUrgent": false,
       "taskType": "스튜디오 퇴실청소",
@@ -212,12 +218,12 @@
       "feedbackText": null
     },
     {
-      "_state": "IN_PROGRESS × 강남점 — 임박 확인 #2",
+      "_state": "STARTED × 강남점 — 임박 확인 #2",
       "_dueAt_role": "URGENT",
       "_scheduledAt_role": "TODAY",
       "_urgentOffsetMin": 15,
       "ticketId": "W1-TCKT-012B",
-      "ticketStatus": "IN_PROGRESS",
+      "ticketStatus": "STARTED",
       "isNew": false,
       "isUrgent": false,
       "taskType": "스튜디오 퇴실청소",
@@ -232,12 +238,12 @@
       "feedbackText": null
     },
     {
-      "_state": "IN_PROGRESS × 홍대점 — 임박 + isUrgent=true",
+      "_state": "STARTED × 홍대점 — 임박 + isUrgent=true",
       "_dueAt_role": "URGENT",
       "_scheduledAt_role": "TODAY",
       "_urgentOffsetMin": 10,
       "ticketId": "W1-TCKT-012C",
-      "ticketStatus": "IN_PROGRESS",
+      "ticketStatus": "STARTED",
       "isNew": false,
       "isUrgent": true,
       "taskType": "재실 청소",
@@ -252,11 +258,11 @@
       "feedbackText": null
     },
     {
-      "_state": "IN_PROGRESS × 역삼점 — 지연 확인용",
+      "_state": "STARTED × 역삼점 — 지연 확인용",
       "_dueAt_role": "PAST",
       "_scheduledAt_role": "TODAY",
       "ticketId": "W1-TCKT-012",
-      "ticketStatus": "IN_PROGRESS",
+      "ticketStatus": "STARTED",
       "isNew": false,
       "isUrgent": false,
       "taskType": "스튜디오 테라스 퇴실청소",
@@ -271,11 +277,11 @@
       "feedbackText": null
     },
     {
-      "_state": "IN_PROGRESS × 홍대점 — 정상",
+      "_state": "STARTED × 홍대점 — 정상",
       "_dueAt_role": "NORMAL",
       "_scheduledAt_role": "TODAY",
       "ticketId": "W1-TCKT-013",
-      "ticketStatus": "IN_PROGRESS",
+      "ticketStatus": "STARTED",
       "isNew": false,
       "isUrgent": false,
       "taskType": "스튜디오 정규청소",
@@ -291,11 +297,12 @@
     },
 
     {
-      "_state": "COMPLETED × 강남점 #1 (SVG4: SYSTEM+OPERATOR 알럿)",
-      "_alert_case": "SVG4 — COMPLETED 지연 카드, registeredAt 기준 최신(OPERATOR) 노출",
+      "_state": "RESOLVED × 강남점 #1 (SVG4: SYSTEM+OPERATOR 알럿)",
+      "_alert_case": "SVG4 — RESOLVED 지연 카드, registeredAt 기준 최신(OPERATOR) 노출",
       "_scheduledAt_role": "TODAY",
+      "_completedAt_role": "TODAY",
       "ticketId": "W1-TCKT-014",
-      "ticketStatus": "COMPLETED",
+      "ticketStatus": "RESOLVED",
       "isNew": false,
       "isUrgent": false,
       "taskType": "스튜디오 퇴실청소",
@@ -306,6 +313,7 @@
       "keeperPhone": "01000000008",
       "scheduledAt": "2026-01-01T08:00:00",
       "dueAt": "2026-01-01T11:00:00",
+      "completedAt": "_TODAY_T11:30:00",
       "photoUrls": [
         "https://images.unsplash.com/photo-1631049307264-da0ec9d70304?w=300",
         "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=300",
@@ -327,10 +335,11 @@
       ]
     },
     {
-      "_state": "COMPLETED × 강남점 #2",
+      "_state": "RESOLVED × 강남점 #2",
       "_scheduledAt_role": "TODAY",
+      "_completedAt_role": "TODAY",
       "ticketId": "W1-TCKT-015",
-      "ticketStatus": "COMPLETED",
+      "ticketStatus": "RESOLVED",
       "isNew": false,
       "isUrgent": false,
       "taskType": "스튜디오 정규청소",
@@ -341,6 +350,7 @@
       "keeperPhone": "01000000009",
       "scheduledAt": "2026-01-01T07:00:00",
       "dueAt": "2026-01-01T10:00:00",
+      "completedAt": "_TODAY_T10:20:00",
       "photoUrls": [
         "https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=300",
         "https://images.unsplash.com/photo-1571175443880-49e1d25b2bc5?w=300",
@@ -350,10 +360,11 @@
       "feedbackText": "전 구역 정규청소 완료. 신발장·냉장고·세면대 비품 정위치 확인."
     },
     {
-      "_state": "COMPLETED × 역삼점 #1",
+      "_state": "RESOLVED × 역삼점 #1",
       "_scheduledAt_role": "TODAY",
+      "_completedAt_role": "TODAY",
       "ticketId": "W1-TCKT-016",
-      "ticketStatus": "COMPLETED",
+      "ticketStatus": "RESOLVED",
       "isNew": false,
       "isUrgent": false,
       "taskType": "스튜디오 테라스 퇴실청소",
@@ -364,6 +375,7 @@
       "keeperPhone": "01000000010",
       "scheduledAt": "2026-01-01T07:30:00",
       "dueAt": "2026-01-01T10:30:00",
+      "completedAt": "_TODAY_T10:45:00",
       "photoUrls": [
         "https://images.unsplash.com/photo-1631049307264-da0ec9d70304?w=300",
         "https://images.unsplash.com/photo-1584622781867-1c5fe959dac0?w=300",
@@ -373,10 +385,11 @@
       "feedbackText": "외부 발코니 포함 전 구역 완료. 테라스 정리·배수구 점검 완료."
     },
     {
-      "_state": "COMPLETED × 역삼점 #2",
+      "_state": "RESOLVED × 역삼점 #2",
       "_scheduledAt_role": "TODAY",
+      "_completedAt_role": "TODAY",
       "ticketId": "W1-TCKT-017",
-      "ticketStatus": "COMPLETED",
+      "ticketStatus": "RESOLVED",
       "isNew": false,
       "isUrgent": false,
       "taskType": "재실 청소",
@@ -387,6 +400,7 @@
       "keeperPhone": "01000000011",
       "scheduledAt": "2026-01-01T08:00:00",
       "dueAt": "2026-01-01T10:00:00",
+      "completedAt": "_TODAY_T10:05:00",
       "photoUrls": [
         "https://images.unsplash.com/photo-1631049307264-da0ec9d70304?w=300",
         "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=300"
@@ -394,11 +408,12 @@
       "feedbackText": "재실청소 완료. 투숙객 요청 침구 교체 및 욕실 어메니티 보충 완료."
     },
     {
-      "_state": "COMPLETED × 홍대점 #1 (SVG9: feedbackText 있음)",
+      "_state": "RESOLVED × 홍대점 #1 (SVG9: feedbackText 있음)",
       "_dueAt_role": "NORMAL",
       "_scheduledAt_role": "TODAY",
+      "_completedAt_role": "TODAY",
       "ticketId": "W1-TCKT-018",
-      "ticketStatus": "COMPLETED",
+      "ticketStatus": "RESOLVED",
       "isNew": false,
       "isUrgent": false,
       "taskType": "스튜디오 퇴실청소",
@@ -409,6 +424,7 @@
       "keeperPhone": "01000000012",
       "scheduledAt": "2026-01-01T07:00:00",
       "dueAt": "2026-01-01T10:00:00",
+      "completedAt": "_TODAY_T09:50:00",
       "photoUrls": [
         "https://images.unsplash.com/photo-1631049307264-da0ec9d70304?w=300",
         "https://images.unsplash.com/photo-1584622781867-1c5fe959dac0?w=300",
@@ -418,11 +434,13 @@
       "feedbackText": "전 구역 청소 완료. 냉장고 물 세팅·어메니티 정위치. 체크인 준비 완료."
     },
     {
-      "_state": "COMPLETED × 홍대점 #2 (SVG8: feedbackText 없음)",
+      "_state": "RESOLVED × 홍대점 #2 (SVG8: feedbackText 없음)",
       "_dueAt_role": "NORMAL",
       "_scheduledAt_role": "TODAY",
+      "_completedAt_role": "TODAY",
+      "_feedbackText_note": "SVG8 케이스(feedbackText 없음) 검수용 — null로 유지할 것",
       "ticketId": "W1-TCKT-019",
-      "ticketStatus": "COMPLETED",
+      "ticketStatus": "RESOLVED",
       "isNew": false,
       "isUrgent": false,
       "taskType": "스튜디오 정규청소",
@@ -433,18 +451,20 @@
       "keeperPhone": "01000000013",
       "scheduledAt": "2026-01-01T06:30:00",
       "dueAt": "2026-01-01T09:30:00",
+      "completedAt": "_TODAY_T09:25:00",
       "photoUrls": [
         "https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=300",
         "https://images.unsplash.com/photo-1571175443880-49e1d25b2bc5?w=300"
       ],
-      "feedbackText": "정규청소 완료. 옷장·싱크대·샤워실 도안 항목 전부 촬영 완료."
+      "feedbackText": null
     },
 
     {
-      "_state": "CANCELLED × 강남점",
+      "_state": "CANCELED × 강남점",
       "_scheduledAt_role": "PAST",
+      "_completedAt_role": "TODAY",
       "ticketId": "W1-TCKT-022",
-      "ticketStatus": "CANCELLED",
+      "ticketStatus": "CANCELED",
       "isNew": false,
       "isUrgent": false,
       "taskType": "재실 청소",
@@ -455,14 +475,16 @@
       "keeperPhone": null,
       "scheduledAt": "2026-01-01T14:00:00",
       "dueAt": "2026-01-01T17:00:00",
+      "completedAt": "_TODAY_T14:10:00",
       "photoUrls": [],
       "feedbackText": "고객 조기 체크인으로 일정 충돌. 운영팀 취소 처리. 키퍼 안내 완료."
     },
     {
-      "_state": "CANCELLED × 역삼점",
+      "_state": "CANCELED × 역삼점",
       "_scheduledAt_role": "PAST",
+      "_completedAt_role": "TODAY",
       "ticketId": "W1-TCKT-023",
-      "ticketStatus": "CANCELLED",
+      "ticketStatus": "CANCELED",
       "isNew": false,
       "isUrgent": false,
       "taskType": "스튜디오 퇴실청소",
@@ -473,14 +495,16 @@
       "keeperPhone": null,
       "scheduledAt": "2026-01-01T15:00:00",
       "dueAt": "2026-01-01T18:00:00",
+      "completedAt": "_TODAY_T15:05:00",
       "photoUrls": [],
       "feedbackText": "예약 취소로 인한 일감 취소. 다음 예약까지 대기."
     },
     {
-      "_state": "CANCELLED × 홍대점",
+      "_state": "CANCELED × 홍대점",
       "_scheduledAt_role": "PAST",
+      "_completedAt_role": "TODAY",
       "ticketId": "W1-TCKT-024",
-      "ticketStatus": "CANCELLED",
+      "ticketStatus": "CANCELED",
       "isNew": false,
       "isUrgent": false,
       "taskType": "시설 점검",
@@ -491,6 +515,7 @@
       "keeperPhone": null,
       "scheduledAt": "2026-01-01T16:00:00",
       "dueAt": "2026-01-01T19:00:00",
+      "completedAt": "_TODAY_T16:05:00",
       "photoUrls": [],
       "feedbackText": "점검 장비 미비로 취소. 익일 재접수 및 키퍼 재배정 예정."
     },
@@ -515,11 +540,11 @@
       "feedbackText": null
     },
     {
-      "_state": "BEFORE_START × 홍대점 — 지연 (urgentChange + 완료)",
+      "_state": "RESERVED × 홍대점 — 지연 (urgentChange + 완료)",
       "_dueAt_role": "PAST",
       "_scheduledAt_role": "TODAY",
       "ticketId": "W1-TCKT-026",
-      "ticketStatus": "BEFORE_START",
+      "ticketStatus": "RESERVED",
       "isNew": false,
       "isUrgent": false,
       "taskType": "재실 청소",
@@ -534,11 +559,11 @@
       "feedbackText": null
     },
     {
-      "_state": "BEFORE_START × 역삼점 — 업무관리 탭 정상 (3버튼 조합 검증)",
+      "_state": "RESERVED × 역삼점 — 업무관리 탭 정상 (3버튼 조합 검증)",
       "_dueAt_role": "NORMAL",
       "_scheduledAt_role": "TODAY",
       "ticketId": "W1-TCKT-028",
-      "ticketStatus": "BEFORE_START",
+      "ticketStatus": "RESERVED",
       "isNew": false,
       "isUrgent": false,
       "taskType": "스튜디오 정규청소",
@@ -553,11 +578,12 @@
       "feedbackText": null
     },
     {
-      "_state": "COMPLETED × 강남점 — 정상완료 + alertMessages (§12-8 검증)",
+      "_state": "RESOLVED × 강남점 — 정상완료 + alertMessages (§12-8 검증)",
       "_dueAt_role": "NORMAL",
       "_scheduledAt_role": "TODAY",
+      "_completedAt_role": "TODAY",
       "ticketId": "W1-TCKT-029",
-      "ticketStatus": "COMPLETED",
+      "ticketStatus": "RESOLVED",
       "isNew": false,
       "isUrgent": false,
       "taskType": "스튜디오 퇴실청소",
@@ -568,6 +594,7 @@
       "keeperPhone": "01000000019",
       "scheduledAt": "2026-01-01T07:00:00",
       "dueAt": "2026-01-01T10:00:00",
+      "completedAt": "_TODAY_T10:15:00",
       "photoUrls": [
         "https://images.unsplash.com/photo-1631049307264-da0ec9d70304?w=300"
       ],

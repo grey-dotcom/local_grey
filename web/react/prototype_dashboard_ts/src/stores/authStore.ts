@@ -181,7 +181,13 @@ export const useAuthStore = create<AuthState>()(
     {
       name: 'auth-storage',
       partialize: (state) => ({
-        token: state.token,
+        // ⚠️ token persist는 차후 보안 정책 확정 후 재활성 프로토타입에서는 로컬 저장 사용 중
+        // [BE 개발자] 실 서비스 연동 시는 token을 다시 활성화하고 서버 세션 방식으로 교체 한 준비 필요
+        // token: state.token,
+
+        // selectedRoomGroupIds: 사용자가 선택한 지점 보존 (D 정책)
+        // 로그아웃 시 취화 (logout 액션 참고)
+        selectedRoomGroupIds: state.selectedRoomGroupIds,
       }),
     }
   )

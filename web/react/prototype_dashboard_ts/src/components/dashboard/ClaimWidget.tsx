@@ -3,22 +3,32 @@
  * @description 클레임 — 필터 레이아웃 3 (Phase 3 기초 UI)
  *
  * [높이 정책] (19차 확정)
- *
- *   카드 수 ≤ MAX_VISIBLE_CARDS(3):
- *     외곽 = 전체 카드 자연 높이 + 패딩
- *
- *   카드 수 > MAX_VISIBLE_CARDS(3):
- *     외곽 = 첫 3개 카드의 실제 렌더 높이 합산 + gap + 패딩으로 고정
- *     4번째 카드부터 내부 스크롤
- *
+ *   카드 수 ≤ MAX_VISIBLE_CARDS(3): 외곽 = 전체 카드 자연 높이 + 패딩
+ *   카드 수 > MAX_VISIBLE_CARDS(3): 외곽 = 첫 3개 실제 렌더 높이 합산 + gap + 패딩 고정
  *   모바일: 높이 제한 없음
+ *
+ * [onCountChange] (65차 신규)
+ *   page.tsx 세그먼트 탭 카운트 실시간 전달용 콜백 prop.
+ *   allClaims 전체(ALL 필터 기준) 카드 수를 전달.
+ *
+ * [정렬 정책] (68차 확정)
+ *   오래된 순(reportedAt ASC) 기본 정렬.
+ *   변경 시 sortClaims() 함수의 sort 방향만 수정.
+ *
+ * [조회 범위] (68차 확정)
+ *   날짜 제한 없음 — 미처리 클레임 전체 표시.
+ *   카드 정렬 기준 추후 변경 가능 (sortClaims 함수 참고).
+ *
+ * [클레임 상태] (68차 신규 — 4종)
+ *   PENDING           → 처리대기
+ *   ACCEPTED          → 인정완료 ⚠️ mock 임시 키
+ *   DISPUTED          → 이의제기 ⚠️ mock 임시 키
+ *   DISPUTE_COMPLETED → 이의제기완료 ⚠️ mock 임시 키
+ *   (BE 키 미확정 — dashboard.ts ClaimStatus 주석 참고)
  *
  * [BE 연동 가이드]
  *   GET /page-dashboard/v1/claims
  *   Query: roomGroupIds={id}&filter={claimFilter}
- *
- * [Claude Code] 기초 UI 구현 — mock 데이터 연결, 필터 탭 껍데기
- *   필터 세부 로직은 Claude Desktop에서 후속 반영
  */
 
 'use client';
@@ -32,24 +42,37 @@ const MAX_VISIBLE_CARDS = 3;
 const CARD_GAP          = 8;
 const LIST_PADDING_V    = 16;
 
-// ── 필터 탭 정의 ─────────────────────────────────────────────────────────
+// ── 정렬 (68차: 오래된 순 ASC 기본) ────────────────────────────────────
+// 정렬 기준 변경 시 이 함수만 수정하면 됨
+// 현재: reportedAt 오름차순 (가장 오래된 클레임 먼저)
+// 변경 예: 최신순 → (a, b) => new Date(b.reportedAt).getTime() - new Date(a.reportedAt).getTime()
+function sortClaims(claims: ClaimReport[]): ClaimReport[] {
+  return [...claims].sort(
+    (a, b) => new Date(a.reportedAt).getTime() - new Date(b.reportedAt).getTime()
+  );
+}
+
+// ── 필터 탭 (68차: 4종으로 확장) ────────────────────────────────────────
+// ⚠️ ACCEPTED·DISPUTED·DISPUTE_COMPLETED는 mock 임시 키 — BE 확인 후 교체
 const FILTER_TABS: { key: ClaimFilter; label: string }[] = [
-  { key: 'ALL',       label: '전체' },
-  { key: 'PENDING',   label: '처리 대기' },
-  { key: 'COMPLETED', label: '완료' },
+  { key: 'ALL',              label: '전체'       },
+  { key: 'PENDING',          label: '처리대기'   },
+  { key: 'DISPUTED',         label: '이의제기'   },
+  { key: 'ACCEPTED',         label: '인정완료'   },
+  { key: 'DISPUTE_COMPLETED', label: '이의제기완료' },
 ];
 
-// ── 필터 로직 (기초) ─────────────────────────────────────────────────────
 function filterClaims(claims: ClaimReport[], filter: ClaimFilter): ClaimReport[] {
   switch (filter) {
-    case 'ALL':       return claims;
-    case 'PENDING':   return claims.filter(c => c.claimStatus === 'PENDING');
-    case 'COMPLETED': return claims.filter(c => c.claimStatus === 'COMPLETED');
-    default:          return claims;
+    case 'ALL':              return claims;
+    case 'PENDING':          return claims.filter(c => c.claimStatus === 'PENDING');
+    case 'ACCEPTED':         return claims.filter(c => c.claimStatus === 'ACCEPTED');          // ⚠️ mock 임시 키
+    case 'DISPUTED':         return claims.filter(c => c.claimStatus === 'DISPUTED');          // ⚠️ mock 임시 키
+    case 'DISPUTE_COMPLETED': return claims.filter(c => c.claimStatus === 'DISPUTE_COMPLETED'); // ⚠️ mock 임시 키
+    default:                 return claims;
   }
 }
 
-// ── 탭별 카운트 ──────────────────────────────────────────────────────────
 function getTabCount(claims: ClaimReport[], filter: ClaimFilter): number {
   return filterClaims(claims, filter).length;
 }
@@ -58,32 +81,35 @@ interface ClaimWidgetProps {
   isMobile?:       boolean;
   isSingleColumn?: boolean;
   is3Col?:         boolean;
-  desktopCols?:    number; // Empty 상태 마진 분기용 (POLICY.md § 6-7)
-  style?:          React.CSSProperties; // 모바일 2열 그리드 배치용 (39차)
+  desktopCols?:    number;
+  style?:          React.CSSProperties;
+  onCountChange?:  (count: number) => void;
 }
 
-export function ClaimWidget({ isMobile = false, isSingleColumn = false, desktopCols = 2, style }: ClaimWidgetProps) {
+export function ClaimWidget({ isMobile = false, isSingleColumn = false, desktopCols = 2, style, onCountChange }: ClaimWidgetProps) {
   const listRef = useRef<HTMLDivElement>(null);
   const [cardListMaxH, setCardListMaxH] = useState<number | null>(null);
   const [measured, setMeasured]         = useState(false);
   const [activeFilter, setActiveFilter] = useState<ClaimFilter>('ALL');
 
+  // 오래된 순 정렬 적용하여 초기 로드
   const [allClaims, setAllClaims] = useState<ClaimReport[]>(
-    (claimsMock.content ?? []) as ClaimReport[]
+    sortClaims((claimsMock.content ?? []) as ClaimReport[])
   );
-  const filtered  = filterClaims(allClaims, activeFilter);
+  const filtered = filterClaims(allClaims, activeFilter);
 
-  // 카드 상태 변경 핸들러 (mock 프로토타입 — BE 연동 시 API 호출로 교체)
   const handleStatusChange = (claimId: string, newStatus: ClaimReport['claimStatus']) => {
     setAllClaims(prev => prev.map(claim =>
       claim.claimId === claimId ? { ...claim, claimStatus: newStatus, isNew: false } : claim
     ));
   };
-  const cardCount = filtered.length;
-  // 카드 수 제한 적용 조건 (39차 확정):
-  //   - 웹(isMobile=false): 항상 적용
-  //   - 모바일 2열(isMobile=true && desktopCols===2): 웹과 동일하게 적용
-  //   - 모바일 1열/탭: 제한 없음
+
+  // 65차: 세그먼트 탭 카운트 실시간 전달
+  useEffect(() => {
+    onCountChange?.(allClaims.length);
+  }, [allClaims.length, onCountChange]);
+
+  const cardCount   = filtered.length;
   const needsScroll = (
     (!isMobile || (isMobile && desktopCols === 2)) &&
     !isSingleColumn &&
@@ -93,30 +119,19 @@ export function ClaimWidget({ isMobile = false, isSingleColumn = false, desktopC
   useEffect(() => {
     setMeasured(false);
     setCardListMaxH(null);
-
-    if (!needsScroll) {
-      setMeasured(true);
-      return;
-    }
-
+    if (!needsScroll) { setMeasured(true); return; }
     const container = listRef.current;
     if (!container) return;
-
     const measure = () => {
       const cards = Array.from(container.children) as HTMLElement[];
       if (cards.length < MAX_VISIBLE_CARDS) return;
-
       let total = LIST_PADDING_V * 2;
-      for (let i = 0; i < MAX_VISIBLE_CARDS; i++) {
-        total += cards[i].getBoundingClientRect().height;
-      }
+      for (let i = 0; i < MAX_VISIBLE_CARDS; i++) total += cards[i].getBoundingClientRect().height;
       total += CARD_GAP * (MAX_VISIBLE_CARDS - 1);
       setCardListMaxH(total);
       setMeasured(true);
     };
-
     measure();
-
     const ro = new ResizeObserver(measure);
     ro.observe(container);
     Array.from(container.children).forEach((child) => ro.observe(child));
@@ -124,22 +139,9 @@ export function ClaimWidget({ isMobile = false, isSingleColumn = false, desktopC
   }, [needsScroll, activeFilter]);
 
   return (
-    <div style={{
-      background: 'white',
-      borderRadius: 8,
-      outline: '1px #EEEEEE solid',
-      outlineOffset: -1,
-      display: 'flex',
-      flexDirection: 'column',
-      overflow: 'hidden',
-      ...style,
-    }}>
+    <div style={{ background: 'white', borderRadius: 8, outline: '1px #EEEEEE solid', outlineOffset: -1, display: 'flex', flexDirection: 'column', overflow: 'hidden', ...style }}>
       {/* 헤더 */}
-      <div style={{
-        padding: isMobile ? '16px 16px 12px' : '24px 24px 18px',
-        display: 'flex', flexDirection: 'column', gap: 16,
-        flexShrink: 0,
-      }}>
+      <div style={{ padding: isMobile ? '16px 16px 12px' : '24px 24px 18px', display: 'flex', flexDirection: 'column', gap: 16, flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <div style={{ flex: '1 1 0', display: 'flex', alignItems: 'center', gap: 8 }}>
             <h3 style={{ margin: 0, color: 'rgba(0,0,0,0.87)', fontSize: 20, fontWeight: 700, lineHeight: '32px', letterSpacing: '0.20px' }}>
@@ -151,7 +153,6 @@ export function ClaimWidget({ isMobile = false, isSingleColumn = false, desktopC
               </svg>
             </button>
           </div>
-          {/* + 클레임 등록 버튼 — FeedWidget "일감 생성" 공통 스펙 */}
           <button type="button"
             style={{ paddingInline: 10, paddingBlock: 4, background: '#E0E0E0', borderRadius: 4, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, color: 'rgba(0,0,0,0.87)', fontSize: 13, fontWeight: 500, lineHeight: '22px', letterSpacing: '0.20px' }}
             onClick={() => console.log('[ClaimWidget] 클레임 등록')}
@@ -163,11 +164,11 @@ export function ClaimWidget({ isMobile = false, isSingleColumn = false, desktopC
           </button>
         </div>
 
-        {/* 필터 탭 — FeedWidget 공통 스펙 (테두리 없음, flexWrap, 99+ §12-5) */}
+        {/* 필터 탭 — 4종 (68차 확장) */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           {FILTER_TABS.map(tab => {
-            const isActive = activeFilter === tab.key;
-            const count    = getTabCount(allClaims, tab.key);
+            const isActive     = activeFilter === tab.key;
+            const count        = getTabCount(allClaims, tab.key);
             const displayCount = count > 99 ? '99+' : count;
             return isActive ? (
               <button key={tab.key} type="button" onClick={() => setActiveFilter(tab.key)}
@@ -179,7 +180,7 @@ export function ClaimWidget({ isMobile = false, isSingleColumn = false, desktopC
               </button>
             ) : (
               <button key={tab.key} type="button" onClick={() => setActiveFilter(tab.key)}
-                style={{ paddingBlock: 4, paddingInline: 4, background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(0,0,0,0.60)', fontSize: 14, fontWeight: 500, lineHeight: '24px', letterSpacing: '0.20px', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                style={{ paddingBlock: 4, paddingInline: 4, background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(0,0,0,0.38)', fontSize: 14, fontWeight: 500, lineHeight: '24px', letterSpacing: '0.20px', whiteSpace: 'nowrap', flexShrink: 0 }}>
                 {tab.label} {displayCount}
               </button>
             );
@@ -187,49 +188,16 @@ export function ClaimWidget({ isMobile = false, isSingleColumn = false, desktopC
         </div>
       </div>
 
-      {/* 구분선 */}
       <div style={{ height: 0, borderTop: '1px solid #EEEEEE', flexShrink: 0 }} />
 
-      {/* 카드 리스트 */}
-      <div
-        ref={listRef}
-        style={{
-          paddingTop: LIST_PADDING_V,
-          paddingLeft: isMobile ? 16 : 24,
-          paddingRight: isMobile ? 16 : 24,
-          paddingBottom: LIST_PADDING_V,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: CARD_GAP,
-          ...(needsScroll
-            ? {
-                overflowY: 'auto',
-                maxHeight: cardListMaxH ?? 'none',
-                opacity: measured ? 1 : 0,
-                transition: 'opacity 0.15s ease',
-              }
-            : { overflowY: 'visible' }),
-        }}
-      >
+      <div ref={listRef} style={{ paddingTop: LIST_PADDING_V, paddingLeft: isMobile ? 16 : 24, paddingRight: isMobile ? 16 : 24, paddingBottom: LIST_PADDING_V, display: 'flex', flexDirection: 'column', gap: CARD_GAP, ...(needsScroll ? { overflowY: 'auto', maxHeight: cardListMaxH ?? 'none', opacity: measured ? 1 : 0, transition: 'opacity 0.15s ease' } : { overflowY: 'visible' }) }}>
         {filtered.length === 0 ? (
-          // Empty 상태 (POLICY.md § 6-7) — 열 수에 따라 상/하 마진 분기
-          <div style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            paddingTop: isMobile ? 40 : 200,
-            paddingBottom: isMobile ? 40 : 200,
-          }}>
-            <span style={{ fontSize: 14, color: 'rgba(0,0,0,0.38)', textAlign: 'center' }}>
-              조회된 일감이 없습니다.
-            </span>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', paddingTop: isMobile ? 40 : 200, paddingBottom: isMobile ? 40 : 200 }}>
+            <span style={{ fontSize: 14, color: 'rgba(0,0,0,0.38)', textAlign: 'center' }}>조회된 클레임이 없습니다.</span>
           </div>
         ) : (
           filtered.map(claim => (
-            <ClaimCard
-              key={claim.claimId}
-              claim={claim}
-              isMobile={isMobile}
-              onStatusChange={handleStatusChange}
-            />
+            <ClaimCard key={claim.claimId} claim={claim} isMobile={isMobile} onStatusChange={handleStatusChange} />
           ))
         )}
       </div>

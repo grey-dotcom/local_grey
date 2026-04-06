@@ -21,49 +21,29 @@
  * ─────────────────────────────────────────────────────────────────────────
  *
  * ─ 높이 정책 (19차 확정) ─────────────────────────────────────────────────
- *   카드 수 ≤ MAX_VISIBLE_CARDS(4):
- *     외곽 = 전체 카드 자연 높이 + 패딩
- *   카드 수 > MAX_VISIBLE_CARDS(4):
- *     외곽 = 첫 4개 카드 실제 렌더 높이 합산 + gap + 패딩으로 고정
- *     5번째 카드부터 내부 스크롤
- *   구현: ResizeObserver DOM 측정 + opacity 깜빡임 방지
- *   모바일: 높이 제한 없음
+ *   카드 수 ≤ MAX_VISIBLE_CARDS(4): 외곽 = 전체 카드 자연 높이 + 패딩
+ *   카드 수 > MAX_VISIBLE_CARDS(4): 외곽 = 첫 4개 실제 렌더 높이 합산 + gap + 패딩 고정
+ *   구현: ResizeObserver DOM 측정 + opacity 깜빡임 방지 / 모바일: 높이 제한 없음
  *
- * ─ 탭 순서 정책 (21차 확정) ─────────────────────────────────────────────
- *   전체 → 업무관리 → 지연/임박 → 취소 → 완료
- *   ※ 모바일 앱 기준. 웹도 동일 적용.
+ * ─ 탭 순서 정책 (21차 확정) ──────────────────────────────────────────────
+ *   전체 → 업무관리 → 지연/임박 → 취소 → 완료 (모바일 앱 기준, 웹도 동일)
  *
- * ─ 업무관리 탭 필터 기준 ─────────────────────────────────────────────────
- *   REPORTED|UNASSIGNED|ASSIGNED|BEFORE_START|IN_PROGRESS 전체 표시
- *   지연/임박 카드 중복 표시 여부 → PM 확인 필요
- *   [BE 연동 시] filter=TASK 파라미터 또는 별도 API 협의 필요
- *
- * ─ mock dueAt 자동 재계산 정책 (21차 신규) ──────────────────────────────
- *   목적: 매일 로케일 기준 00:00이 되면 오늘 날짜 기준 카드가 자동 구성되어
- *         지연/임박/정상 카드를 별도 수작업 없이 확인 가능하게 함.
- *   feed.json _dueAt_role 필드: PAST(지연) / URGENT(임박) / NORMAL(정상)
- *   ⚠️ 프로토타입 전용. 실 서비스에서는 applyTodayDueAt() 호출 제거.
- *
- * ─ NEW 세션 랜덤 복구 정책 (22차 신규) ──────────────────────────────────
- *   목적: 새 세션(브라우저 탭 재시작) 시 일부 카드에 NEW 배지를 랜덤 복구하여
- *         실서비스처럼 새로운 변경사항이 생긴 상태를 시뮬레이션.
- *   동작:
- *     1. 세션 시작 시 localStorage에 NEW 상태 키(feed_new_w1 등)가 없으면
- *        전체 티켓 중 일부(NEW_RANDOM_RATIO 비율)를 랜덤 선택 → 저장
- *     2. 이미 저장된 키가 있으면 그 목록 그대로 복원
- *     3. 카드 클릭 / 버튼 클릭 시 onDismissNew 콜백 → localStorage 동기 업데이트
- *   localStorage 키: feed_new_{workspaceKey} (예: feed_new_w1)
- *   ⚠️ 프로토타입 전용. 실 서비스에서는 applyRandomNew() 및 dismissNew 로직 제거,
- *      isNew는 BE API 응답의 isNew 필드 직접 사용.
+ * ─ onCountChange (65차 신규) ─────────────────────────────────────────────
+ *   page.tsx 세그먼트 탭의 카운트를 실시간으로 전달하기 위한 콜백 prop.
+ *   roomFilteredTickets 전체(ALL 필터 기준)의 카드 수를 전달.
+ *   실 서비스에서도 유지 가능 (mock 전용 아님).
  *
  * ─ 지점 필터링 정책 ──────────────────────────────────────────────────────
  *   activeTabGroupId !== null → 해당 지점만
  *   selectedRoomGroupIds=[A,B] → A, B만
  *   selectedRoomGroupIds=[] → 전체
  *
- * ─ BE 연동 가이드 ─────────────────────────────────────────────────────────
+ * ─ BE 연동 가이드 ────────────────────────────────────────────────────────
  *   GET /page-dashboard/v1/ticket-reports
  *   Query: roomGroupIds={id}&filter={feedFilter}&sort=LATEST&page=0&size=20
+ *
+ * ─ 상태값 정책 (68차 교체) ───────────────────────────────────────────────
+ *   BE 원본 키로 전면 교체. 상세: docs/STATUS_POLICY.md §3
  */
 
 'use client';
@@ -83,38 +63,24 @@ const LIST_PADDING_V    = 16;
 
 // ── NEW 랜덤 복구 상수 ────────────────────────────────────────────────────────
 // ⚠️ 프로토타입 전용. 실 서비스 연동 시 이 상수 및 관련 함수/호출부를 제거할 것.
-const NEW_RANDOM_RATIO = 0.35; // 전체 티켓 중 NEW 배지를 붙일 비율 (0~1)
+const NEW_RANDOM_RATIO = 0.35;
 
-// ── 필터 탭 (21차 확정: 전체 → 업무관리 → 지연/임박 → 취소 → 완료) ───────────
+// ── 필터 탭 (21차 확정 / 68차 키 교체) ──────────────────────────────────────
 interface FilterTab { key: FeedFilter; label: string; }
 const FILTER_TABS: FilterTab[] = [
   { key: 'ALL',       label: '전체'     },
   { key: 'TASK',      label: '업무관리' },
   { key: 'DELAY',     label: '지연/임박' },
-  { key: 'CANCELLED', label: '취소'     },
+  { key: 'CANCELED',  label: '취소'     }, // ⚠️ 68차: CANCELLED → CANCELED
   { key: 'COMPLETED', label: '완료'     },
 ];
 
-// ── 탭별 대상 상태 (27차 확정) ───────────────────────────────────────────────
-//
-// [업무관리] REPORTED~IN_PROGRESS 전체 — 지연/임박 카드 중복 포함
-//   목적: 상태값 기준 보고됨~수행중까지의 과정 관리
-//   지연/임박은 일의 진행 상태(dueAt 기준)이므로 업무관리와 중복 노출 가능
-//
-// [취소] CANCELLED + ON_HOLD
-//   ON_HOLD(보류) = 완료 건의 정산 보류 등 종료 처리 보류 상태
-//   완료/보류/취소 = "더이상 일이 진행되지 않음" → 취소 탭에 통합
-//
-// [완료] COMPLETED만
-// 61차 정책 개선:
-// - TASK: REPORTED 제외 (issueticket으로 분리) / ON_HOLD 제외 (처리필요 위젯 보류 탭으로 이동)
-// - DELAY: IN_PROGRESS 제외 확정 (수행중은 지연/임박 미포함 — isDelayOrUrgent 조건에서 충분히 처리)
-// - CANCELLED: ON_HOLD 제외 (보류는 취소가 아님, 취소만)
-const TASK_STATUSES:      TicketStatus[] = ['UNASSIGNED', 'ASSIGNED', 'BEFORE_START', 'IN_PROGRESS'];
-const CANCELLED_STATUSES: TicketStatus[] = ['CANCELLED'];
-const COMPLETED_STATUSES: TicketStatus[] = ['COMPLETED'];
+// ── 탭별 대상 상태 (61차 확정 / 68차 키 교체) ───────────────────────────────
+// ⚠️ 68차: UNASSIGNED→PENDING, BEFORE_START→RESERVED, IN_PROGRESS→STARTED
+const TASK_STATUSES:      TicketStatus[] = ['PENDING', 'ASSIGNED', 'RESERVED', 'STARTED'];
+const CANCELED_STATUSES:  TicketStatus[] = ['CANCELED'];  // ⚠️ 68차: CANCELLED → CANCELED
+const COMPLETED_STATUSES: TicketStatus[] = ['RESOLVED'];  // ⚠️ 68차: COMPLETED → RESOLVED
 
-// localOverrides: FeedCard에서 변경된 status를 반영하여 필터링
 function filterTickets(
   tickets: TicketReport[],
   filter: FeedFilter,
@@ -128,49 +94,31 @@ function filterTickets(
   switch (filter) {
     case 'ALL':
       return tickets;
-
     case 'TASK':
-      // 업무관리: UNASSIGNED/ASSIGNED/BEFORE_START/IN_PROGRESS
-      // 단, 지연/임박 건 제외 (dueAt 30분 이내 또는 초과 건은 DELAY 탭에서만 표시)
-      // 완료(COMPLETED) · 취소(CANCELLED) · 보류(ON_HOLD)는 미포함
       return tickets.filter((t) => {
         const status = getStatus(t);
         if (!TASK_STATUSES.includes(status)) return false;
-        // 지연/임박 건은 제외
         if (isDelayOrUrgent({ ...t, ticketStatus: status }) || getIsUrgent(t)) return false;
         return true;
       });
-
     case 'DELAY':
-      // 61차 정책:
-      // - IN_PROGRESS 제외: 수행중은 지연/임박 탭 미포함
-      // - COMPLETED 제외: 완료된 건은 완료 탭에서만 표시
-      // - CANCELLED 제외: 취소된 건은 취소 탭에서만 표시
-      // 대상: UNASSIGNED/ASSIGNED/BEFORE_START만, dueAt 30분 이내 또는 초과
       return tickets.filter((t) => {
         const status = getStatus(t);
-        if (status === 'IN_PROGRESS') return false;
-        if (status === 'COMPLETED') return false;
-        if (status === 'CANCELLED') return false;
+        if (status === 'STARTED')  return false; // ⚠️ 68차: IN_PROGRESS → STARTED
+        if (status === 'RESOLVED') return false; // ⚠️ 68차: COMPLETED → RESOLVED
+        if (status === 'CANCELED') return false; // ⚠️ 68차: CANCELLED → CANCELED
         return isDelayOrUrgent({ ...t, ticketStatus: status }) || getIsUrgent(t);
       });
-
-    case 'CANCELLED':
-      // 취소: CANCELLED + ON_HOLD(보류) — 더이상 일이 진행되지 않는 상태 (27차 확정)
-      return tickets.filter((t) => CANCELLED_STATUSES.includes(getStatus(t)));
-
+    case 'CANCELED':  // ⚠️ 68차: CANCELLED → CANCELED
+      return tickets.filter((t) => CANCELED_STATUSES.includes(getStatus(t)));
     case 'COMPLETED':
-      // 완료: COMPLETED만
       return tickets.filter((t) => COMPLETED_STATUSES.includes(getStatus(t)));
-
     default:
       return tickets;
   }
 }
 
-// ── mock dueAt 자동 재계산 ────────────────────────────────────────────────────
-// ⚠️ 프로토타입 전용. 실 서비스 연동 시 이 함수와 호출부를 제거할 것.
-// feed.json _dueAt_role: PAST(지연) / URGENT(NOW+offset분, 임박) / NORMAL(정상)
+// ── mock dueAt 자동 재계산 (21차, 프로토타입 전용) ───────────────────────────
 function applyTodayDueAt(tickets: TicketReport[]): TicketReport[] {
   const now   = new Date();
   const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
@@ -182,17 +130,12 @@ function applyTodayDueAt(tickets: TicketReport[]): TicketReport[] {
     const role = raw._dueAt_role as string | undefined;
     const scheduledRole = raw._scheduledAt_role as string | undefined;
 
-    // ── scheduledAt 재계산 (_scheduledAt_role: TODAY|NORMAL → 오늘 날짜, PAST → 원본 유지) ──
-    // ⚠️ 프로토타입 전용. KPI 달성률 계산(KpiCards.tsx)에 반드시 필요.
-    // TODAY/NORMAL: 오늘 날짜 + 원본 시각으로 교체
-    // PAST/없음: 원본 그대로 유지 (취소/보류 등 완결된 과거 건)
     let newScheduledAt = t.scheduledAt;
     if (scheduledRole === 'TODAY' || scheduledRole === 'NORMAL') {
-      const timeOnlySch = t.scheduledAt.includes('T') ? t.scheduledAt.split('T')[1] : '00:00:00';
-      newScheduledAt = `${today}T${timeOnlySch}`;
+      const timeOnly = t.scheduledAt.includes('T') ? t.scheduledAt.split('T')[1] : '00:00:00';
+      newScheduledAt = `${today}T${timeOnly}`;
     }
 
-    // ── dueAt 재계산 (_dueAt_role: URGENT|PAST|NORMAL) ────────────────────────
     if (!role) return { ...t, scheduledAt: newScheduledAt };
 
     if (role === 'URGENT') {
@@ -201,31 +144,20 @@ function applyTodayDueAt(tickets: TicketReport[]): TicketReport[] {
       return { ...t, scheduledAt: newScheduledAt, dueAt: `${today}T${pad(urgentDate.getHours())}:${pad(urgentDate.getMinutes())}:00` };
     }
 
-    // NORMAL: 원본 시각(고정값) 대신 NOW + _normalOffsetMin 으로 동적 계산 (62차 근본 수정)
-    // 이유: 원본 시각(예: 22:00)을 오늘 날짜로 붙이면 검수 시각에 따라 이미 지연으로 판정되는 문제.
-    // _normalOffsetMin 미지정 시 기본값 90분 — 항상 현재 시각 기준 미래 시각 보장.
-    // PAST: 지연 카드 전용. 원본 시각 그대로 오늘 날짜로 교체 (이미 지난 시각 의도).
     if (role === 'NORMAL') {
       const offsetMin: number = raw._normalOffsetMin ?? 90;
       const normalDate = new Date(now.getTime() + offsetMin * 60 * 1000);
       return { ...t, scheduledAt: newScheduledAt, dueAt: `${today}T${pad(normalDate.getHours())}:${pad(normalDate.getMinutes())}:00` };
     }
 
-    // PAST: 오늘 날짜 + 원본 시각(이미 지난 시각) — 지연 카드 전용
+    // PAST
     const timeOnly = t.dueAt.includes('T') ? t.dueAt.split('T')[1] : '00:00:00';
     return { ...t, scheduledAt: newScheduledAt, dueAt: `${today}T${timeOnly}` };
   });
 }
 
-// ── NEW 세션 랜덤 복구 ────────────────────────────────────────────────────────
-// ⚠️ 프로토타입 전용. 실 서비스 연동 시 이 함수와 관련 호출부를 제거할 것.
-//
-// 동작:
-//   - localStorage에 newIds 저장 키가 없으면 → 랜덤 선택 후 저장
-//   - 저장 키가 있으면 → 그대로 복원
-//   - 이후 티켓 목록의 isNew 필드를 newIds 기준으로 덮어씀
+// ── NEW 세션 랜덤 복구 (22차, 프로토타입 전용) ───────────────────────────────
 function getNewStorageKey(workspaceId: string): string {
-  // workspaceId 마지막 1글자로 w1/w2 구분 (mockStore.ts의 WORKSPACE_KEY_MAP 패턴 참고)
   const suffix = workspaceId.endsWith('2') ? 'w1' : workspaceId.endsWith('3') ? 'w2' : 'w1';
   return `feed_new_${suffix}`;
 }
@@ -234,22 +166,18 @@ function applyRandomNew(tickets: TicketReport[], workspaceId: string): TicketRep
   if (typeof window === 'undefined') return tickets;
   const key = getNewStorageKey(workspaceId);
   let newIds: string[];
-
   const stored = localStorage.getItem(key);
   if (stored) {
     try {
       newIds = JSON.parse(stored) as string[];
     } catch {
-      // 파싱 실패 시 랜덤 재생성
       newIds = pickRandomIds(tickets);
       localStorage.setItem(key, JSON.stringify(newIds));
     }
   } else {
-    // 세션 최초 — 랜덤 선택 후 저장
     newIds = pickRandomIds(tickets);
     localStorage.setItem(key, JSON.stringify(newIds));
   }
-
   const newSet = new Set(newIds);
   return tickets.map((t) => ({ ...t, isNew: newSet.has(t.ticketId) }));
 }
@@ -269,7 +197,7 @@ function persistDismissNew(workspaceId: string, ticketId: string): void {
     const ids: string[] = JSON.parse(stored);
     const next = ids.filter((id) => id !== ticketId);
     localStorage.setItem(key, JSON.stringify(next));
-  } catch { /* 무시 */ }
+  } catch { /* ignore */ }
 }
 
 // ── Props ────────────────────────────────────────────────────────────────────
@@ -277,10 +205,11 @@ interface FeedWidgetProps {
   isMobile?:       boolean;
   isSingleColumn?: boolean;
   is3Col?:         boolean;
-  desktopCols?:    number; // Empty 상태 마진 분기용 (§ 6-7)
+  desktopCols?:    number;
+  onCountChange?:  (count: number) => void; // 65차: 세그먼트 탭 카운트 실시간 전달용
 }
 
-export function FeedWidget({ isMobile = false, isSingleColumn = false, desktopCols = 2 }: FeedWidgetProps) {
+export function FeedWidget({ isMobile = false, isSingleColumn = false, desktopCols = 2, onCountChange }: FeedWidgetProps) {
   const feedFilter    = useDashboardStore((s) => s.feedFilter);
   const setFeedFilter = useDashboardStore((s) => s.setFeedFilter);
 
@@ -290,8 +219,6 @@ export function FeedWidget({ isMobile = false, isSingleColumn = false, desktopCo
 
   const [allTickets, setAllTickets]         = useState<TicketReport[]>([]);
   const [loading, setLoading]               = useState(true);
-  // 25차: FeedCard localStatus/localIsUrgent를 FeedWidget으로 끌어올림
-  // key: ticketId, value: { status, isUrgent }
   const [localOverrides, setLocalOverrides] = useState<Map<string, CardLocalState>>(new Map());
 
   const handleLocalStateChange = (ticketId: string, next: CardLocalState) => {
@@ -308,7 +235,6 @@ export function FeedWidget({ isMobile = false, isSingleColumn = false, desktopCo
     if (!workspaceId) return;
     setLoading(true);
     loadMockFeed(workspaceId).then((res) => {
-      // ⚠️ 프로토타입 전용: 실 서비스 연동 시 아래 두 줄 제거 후 res.content 직접 사용
       const todayTickets = applyTodayDueAt(res.content as TicketReport[]);
       const newTickets   = applyRandomNew(todayTickets, workspaceId);
       setAllTickets(newTickets);
@@ -316,9 +242,6 @@ export function FeedWidget({ isMobile = false, isSingleColumn = false, desktopCo
     });
   }, [staffAuth?.workspaceId]);
 
-  // ── NEW 소멸 핸들러 ───────────────────────────────────────────────────────
-  // 카드/버튼 클릭 시 FeedCard에서 호출됨 → 상태 + localStorage 동기 업데이트
-  // ⚠️ 프로토타입 전용. 실 서비스 연동 시 이 핸들러 및 persistDismissNew 제거.
   const handleDismissNew = (ticketId: string) => {
     const workspaceId = staffAuth?.workspaceId;
     if (workspaceId) persistDismissNew(workspaceId, ticketId);
@@ -327,7 +250,6 @@ export function FeedWidget({ isMobile = false, isSingleColumn = false, desktopCo
     );
   };
 
-  // 탭 카운터는 localOverrides 반영 기준으로 계산
   const roomFilteredTickets = useMemo(() => {
     if (activeTabGroupId)
       return allTickets.filter((t) => t.roomGroupId === activeTabGroupId);
@@ -341,10 +263,11 @@ export function FeedWidget({ isMobile = false, isSingleColumn = false, desktopCo
     [roomFilteredTickets, feedFilter, localOverrides],
   );
 
-  // 카드 수 제한 적용 조건 (39차 확정):
-  //   - 웹(isMobile=false): 항상 적용
-  //   - 모바일 2열(isMobile=true && desktopCols===2): 웹과 동일하게 적용
-  //   - 모바일 1열/탭(isSingleColumn 또는 desktopCols===1): 제한 없음
+  // 65차: 세그먼트 탭 카운트 실시간 전달 — ALL 기준 총 카드 수
+  useEffect(() => {
+    onCountChange?.(roomFilteredTickets.length);
+  }, [roomFilteredTickets.length, onCountChange]);
+
   const needsScroll = (
     (!isMobile || (isMobile && desktopCols === 2)) &&
     !isSingleColumn &&
@@ -354,12 +277,9 @@ export function FeedWidget({ isMobile = false, isSingleColumn = false, desktopCo
   useEffect(() => {
     setMeasured(false);
     setCardListMaxH(null);
-
     if (!needsScroll) { setMeasured(true); return; }
-
     const container = listRef.current;
     if (!container) return;
-
     const measure = () => {
       const cards = Array.from(container.children) as HTMLElement[];
       if (cards.length < MAX_VISIBLE_CARDS) return;
@@ -369,7 +289,6 @@ export function FeedWidget({ isMobile = false, isSingleColumn = false, desktopCo
       setCardListMaxH(total);
       setMeasured(true);
     };
-
     measure();
     const ro = new ResizeObserver(measure);
     ro.observe(container);
@@ -382,7 +301,7 @@ export function FeedWidget({ isMobile = false, isSingleColumn = false, desktopCo
   return (
     <div style={{ background: 'white', borderRadius: 8, outline: '1px #EEEEEE solid', outlineOffset: -1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
-      {/* ── 헤더 ── */}
+      {/* 헤더 */}
       <div style={{ padding: isMobile ? '16px 16px 12px' : '24px 24px 18px', display: 'flex', flexDirection: 'column', gap: 16, flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <div style={{ flex: '1 1 0', display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -406,13 +325,11 @@ export function FeedWidget({ isMobile = false, isSingleColumn = false, desktopCo
           </button>
         </div>
 
-        {/* ── 필터 탭 (POLICY § 12-5, 33차 확정) ──
-             flexWrap: wrap — 넘치면 2줄 허용 (모바일 1열 포함 전체)
-             gap: 8, flexShrink: 0 — 탭 텍스트 잔림 방지 */}
+        {/* 필터 탭 (POLICY § 12-5) */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           {FILTER_TABS.map((tab) => {
-            const isActive = feedFilter === tab.key;
-            const count    = filterTickets(roomFilteredTickets, tab.key, localOverrides).length;
+            const isActive     = feedFilter === tab.key;
+            const count        = filterTickets(roomFilteredTickets, tab.key, localOverrides).length;
             const displayCount = count > 99 ? '99+' : count;
             return isActive ? (
               <button key={tab.key} type="button" onClick={() => setFeedFilter(tab.key)}
@@ -424,7 +341,7 @@ export function FeedWidget({ isMobile = false, isSingleColumn = false, desktopCo
               </button>
             ) : (
               <button key={tab.key} type="button" onClick={() => setFeedFilter(tab.key)}
-                style={{ paddingBlock: 4, paddingInline: 4, background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(0,0,0,0.60)', fontSize: 14, fontWeight: 500, lineHeight: '24px', letterSpacing: '0.20px', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                style={{ paddingBlock: 4, paddingInline: 4, background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(0,0,0,0.38)', fontSize: 14, fontWeight: 500, lineHeight: '24px', letterSpacing: '0.20px', whiteSpace: 'nowrap', flexShrink: 0 }}>
                 {tab.label} {displayCount}
               </button>
             );
@@ -436,23 +353,9 @@ export function FeedWidget({ isMobile = false, isSingleColumn = false, desktopCo
 
       {loading && <div style={{ padding: 40, textAlign: 'center', color: 'rgba(0,0,0,0.38)', fontSize: 14 }}>로딩 중...</div>}
 
-      {/* ── Empty 상태 (POLICY.md § 6-7, 34차 확정) ──
-          - 안내 문구: "조회된 일감이 없습니다."
-          - 데스크탑 2열: 상/하 200px / 모바일·1열: 40px
-          - 공간번호 검색 도입 시 검색 결과 없음 상태에도 동일 UI 재사용 */}
       {!loading && filteredTickets.length === 0 && (
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          paddingTop:    isMobile ? 40 : 200,
-          paddingBottom: isMobile ? 40 : 200,
-          paddingLeft: 24,
-          paddingRight: 24,
-        }}>
-          <span style={{ fontSize: 14, color: 'rgba(0,0,0,0.38)', textAlign: 'center' }}>
-            조회된 일감이 없습니다.
-          </span>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', paddingTop: isMobile ? 40 : 200, paddingBottom: isMobile ? 40 : 200, paddingLeft: 24, paddingRight: 24 }}>
+          <span style={{ fontSize: 14, color: 'rgba(0,0,0,0.38)', textAlign: 'center' }}>조회된 일감이 없습니다.</span>
         </div>
       )}
 

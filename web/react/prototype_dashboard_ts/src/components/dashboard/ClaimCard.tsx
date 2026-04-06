@@ -2,23 +2,31 @@
  * @file components/dashboard/ClaimCard.tsx
  * @description 클레임 — 개별 클레임 카드 컴포넌트 (기초 UI)
  *
- * ─ Claude Code 작업 (서브) ────────────────────────────────────────────────
- *   IssueCard.tsx / FeedCard.tsx 스타일 패턴 참고
- *   공통 요소: ImageGrid, ActionButton(hover), ConfirmModal — FeedCard 패턴 이식
- *   정책 로직은 Claude Desktop에서 후속 반영
- *
  * ─ 배지 구성 ──────────────────────────────────────────────────────────────
  *   [NEW]  isNew === true 일 때 노출
  *   [상태]  claimStatus 한글 라벨 (상태별 색상 차등)
- *   flexWrap: nowrap + overflow: hidden — 59차 정책 (줄바꿈 절대 불가)
+ *   flexWrap: wrap + overflow: visible — 62차 FeedCard·IssueCard 정책 통일
  *
  * ─ 좌측 색상바 ────────────────────────────────────────────────────────────
- *   PENDING   → #FF1744 (빨강 — 긴급 투숙객 클레임)
- *   COMPLETED → #9E9E9E (회색)
+ *   PENDING·DISPUTED → #FF1744 (빨강 — 미처리·이의제기)
+ *   ACCEPTED·DISPUTE_COMPLETED → #9E9E9E (회색 — 완료)
  *
- * ─ 예외처리 ───────────────────────────────────────────────────────────────
- *   photoUrls 빈 배열 → 이미지 미노출
- *   comment null → 코멘트 영역 미노출
+ * ─ 클레임 상태 (68차 신규) ───────────────────────────────────────────────
+ *   PENDING           → 처리대기 (인정 또는 이의제기 대기)
+ *   ACCEPTED          → 인정완료 ⚠️ mock 임시 키 — BE 확인 후 교체
+ *   DISPUTED          → 이의제기 ⚠️ mock 임시 키 — BE 확인 후 교체
+ *   DISPUTE_COMPLETED → 이의제기완료 ⚠️ mock 임시 키 — BE 확인 후 교체
+ *   (dashboard.ts ClaimStatus 주석 참고)
+ *
+ * ─ 액션 버튼 ─────────────────────────────────────────────────────────────
+ *   PENDING:           이의제기(outlined, error) + 인정(contained, primary)
+ *   DISPUTED:          버튼 없음 (진행중)
+ *   ACCEPTED:          버튼 없음 (읽기전용)
+ *   DISPUTE_COMPLETED: 버튼 없음 (읽기전용)
+ *
+ * ─ ConfirmModal confirmVariant ────────────────────────────────────────────
+ *   'error'   → 확인 버튼 #D32F2F (파괴적 액션)
+ *   'primary' → 확인 버튼 #1976D2 (일반 상태 변경)
  */
 
 'use client';
@@ -29,17 +37,22 @@ import type { ClaimReport } from '@/types/dashboard';
 // ── 상태 배지 ─────────────────────────────────────────────────────────────
 interface BadgeConfig { text: string; bg: string; color: string; icon?: 'check' }
 
+// ⚠️ ACCEPTED·DISPUTED·DISPUTE_COMPLETED는 mock 임시 키 — BE 실측 후 교체 필요
+// [BE 개발자] 실 서비스 enum 키 확인 후 아래 case 값 교체 (dashboard.ts 주석 참고)
 function getStatusBadge(status: ClaimReport['claimStatus']): BadgeConfig {
   switch (status) {
-    case 'PENDING':   return { text: '처리 대기', bg: '#FFF3E0', color: '#E65100' };
-    case 'COMPLETED': return { text: '완료',      bg: '#E8F5E9', color: '#1B5E20', icon: 'check' };
-    default:          return { text: status,       bg: '#EEEEEE', color: '#212121' };
+    case 'PENDING':           return { text: '처리대기',     bg: '#FFF3E0', color: '#E65100' };
+    case 'ACCEPTED':          return { text: '인정완료',     bg: '#E8F5E9', color: '#2E7D32', icon: 'check' };
+    case 'DISPUTED':          return { text: '이의제기',     bg: '#FFF8E1', color: '#F57F17' };
+    case 'DISPUTE_COMPLETED': return { text: '이의제기완료', bg: '#F5F5F5', color: '#757575', icon: 'check' };
+    default:                  return { text: status,         bg: '#EEEEEE', color: '#212121' };
   }
 }
 
 // ── 좌측 색상바 ───────────────────────────────────────────────────────────
+// ⚠️ ACCEPTED·DISPUTE_COMPLETED는 mock 임시 키 — BE 확인 후 교체
 function getColorBar(status: ClaimReport['claimStatus']): string {
-  return status === 'COMPLETED' ? '#9E9E9E' : '#FF1744';
+  return (status === 'ACCEPTED' || status === 'DISPUTE_COMPLETED') ? '#9E9E9E' : '#FF1744';
 }
 
 // ── 시간 포맷 ─────────────────────────────────────────────────────────────
@@ -76,9 +89,14 @@ function ImageGrid({ urls }: { urls: string[] }) {
 }
 
 // ── 확인 팝업 (FeedCard ConfirmModal 패턴 이식) ─────────────────────────
-function ConfirmModal({ title, contents, onConfirm, onCancel }: {
-  title: string; contents?: string; onConfirm: () => void; onCancel: () => void;
+function ConfirmModal({ title, contents, confirmVariant = 'error', onConfirm, onCancel }: {
+  title: string;
+  contents?: string;
+  confirmVariant?: 'primary' | 'error';
+  onConfirm: () => void;
+  onCancel: () => void;
 }) {
+  const confirmBg = confirmVariant === 'error' ? '#D32F2F' : '#1976D2';
   return (
     <div
       style={{
@@ -117,7 +135,7 @@ function ConfirmModal({ title, contents, onConfirm, onCancel }: {
           }}>취소</button>
           <button type="button" onClick={onConfirm} style={{
             height: 36, paddingInline: 16,
-            background: '#1976D2', border: 'none',
+            background: confirmBg, border: 'none',
             borderRadius: 4, cursor: 'pointer',
             fontSize: 14, fontWeight: 500, fontFamily: 'inherit', color: 'white',
           }}>확인</button>
@@ -128,10 +146,12 @@ function ConfirmModal({ title, contents, onConfirm, onCancel }: {
 }
 
 // ── 버튼 (FeedCard ActionButton 패턴 이식 — hover + 반응형) ─────────────
-function ClaimActionButton({ label, isMobile, onClick }: {
-  label: string; isMobile: boolean; onClick: () => void;
+// variant: 'contained'(파란 채움 — 인정) | 'outlined'(빨간 테두리 — 이의제기)
+function ClaimActionButton({ label, isMobile, variant = 'contained', onClick }: {
+  label: string; isMobile: boolean; variant?: 'contained' | 'outlined'; onClick: () => void;
 }) {
   const [hovered, setHovered] = useState(false);
+  const isContained = variant === 'contained';
   return (
     <button type="button" onClick={onClick}
       onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
@@ -143,10 +163,12 @@ function ClaimActionButton({ label, isMobile, onClick }: {
         fontWeight: 500, fontFamily: 'inherit', borderRadius: 4,
         cursor: 'pointer', letterSpacing: '0.20px',
         transition: 'background 0.15s, box-shadow 0.15s',
-        border: 'none',
-        background: hovered ? '#1565C0' : '#1976D2',
-        color: 'white',
-        boxShadow: hovered ? '0 2px 4px rgba(0,0,0,0.2)' : 'none',
+        border: isContained ? 'none' : '1px solid rgba(211,47,47,0.50)',
+        background: isContained
+          ? (hovered ? '#1565C0' : '#1976D2')
+          : (hovered ? 'rgba(211,47,47,0.04)' : 'transparent'),
+        color: isContained ? 'white' : '#D32F2F',
+        boxShadow: isContained && hovered ? '0 2px 4px rgba(0,0,0,0.2)' : 'none',
       }}>
       {label}
     </button>
@@ -184,11 +206,15 @@ interface ClaimCardProps {
 }
 
 export function ClaimCard({ claim, isMobile = false, onDismissNew, onStatusChange }: ClaimCardProps) {
-  const [cardHovered, setCardHovered] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
+  const [cardHovered,   setCardHovered]   = useState(false);
+  const [showConfirm,   setShowConfirm]   = useState(false);
+  // confirmAction: 'accept'(인정) | 'dispute'(이의제기)
+  // ⚠️ ACCEPTED·DISPUTED는 mock 임시 키 — BE 확인 후 교체 (dashboard.ts ClaimStatus 주석 참고)
+  const [confirmAction, setConfirmAction] = useState<'accept' | 'dispute'>('accept');
 
   const statusBadge = getStatusBadge(claim.claimStatus);
-  const isCompleted = claim.claimStatus === 'COMPLETED';
+  // 완료 상태: 인정완료 또는 이의제기완료 — ⚠️ mock 임시 키
+  const isCompleted = claim.claimStatus === 'ACCEPTED' || claim.claimStatus === 'DISPUTE_COMPLETED';
   const colorBar    = getColorBar(claim.claimStatus);
 
   const handleDismissNew = () => {
@@ -196,7 +222,8 @@ export function ClaimCard({ claim, isMobile = false, onDismissNew, onStatusChang
   };
 
   const handleConfirm = () => {
-    onStatusChange?.(claim.claimId, 'COMPLETED');
+    // ⚠️ ACCEPTED·DISPUTED는 mock 임시 키 — BE 실측 후 실제 enum으로 교체
+    onStatusChange?.(claim.claimId, confirmAction === 'accept' ? 'ACCEPTED' : 'DISPUTED');
     setShowConfirm(false);
   };
 
@@ -212,11 +239,20 @@ export function ClaimCard({ claim, isMobile = false, onDismissNew, onStatusChang
 
   return (
     <>
-      {/* 확인 팝업 — FeedCard ConfirmModal 패턴 */}
+      {/* 확인 팝업 */}
       {showConfirm && (
         <ConfirmModal
-          title="선택하신 클레임을 완료 처리하시겠습니까?"
-          contents="완료 처리된 클레임은 복구할 수 없습니다."
+          title={
+            confirmAction === 'accept'
+              ? '선택하신 클레임을 인정 처리하시겠습니까?'
+              : '선택하신 클레임에 이의를 제기하시겠습니까?'
+          }
+          contents={
+            confirmAction === 'accept'
+              ? '인정 처리 후 취소할 수 없습니다.'
+              : '이의를 제기하면 추가 검토가 진행됩니다.'
+          }
+          confirmVariant="error"
           onConfirm={handleConfirm}
           onCancel={() => setShowConfirm(false)}
         />
@@ -242,25 +278,21 @@ export function ClaimCard({ claim, isMobile = false, onDismissNew, onStatusChang
           transform: cardHovered ? 'translateY(-2px)' : 'none',
           cursor: 'default',
           minWidth: 0,
-          // maxWidth 없음 — FeedCard 37차 정책과 동일 (1열 우측 공백 방지)
           width: '100%',
           boxSizing: 'border-box',
         }}
       >
-        {/* 좌측 색상바 — PENDING: #FF1744, COMPLETED: #9E9E9E */}
+        {/* 좌측 색상바 */}
         <div style={{ display: 'flex', borderRadius: 2, overflow: 'hidden', flexShrink: 0 }}>
           <div style={{ width: 4, background: colorBar }} />
         </div>
 
-        {/* 콘텐츠 영역 */}
         <div style={{ flex: '1 1 0', display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }}>
 
           {/* ── 배지 행 + 우측 버튼 ── */}
           <div style={{ opacity: isCompleted ? 0.4 : 1 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-              {/* 배지 영역: nowrap + overflow:hidden — 59차 정책 (줄바꿈 절대 불가) */}
-              <div style={{ flex: '1 1 0', display: 'flex', flexWrap: 'nowrap', gap: isMobile ? 4 : 8, alignItems: 'center', minWidth: 0, overflow: 'hidden' }}>
-                {/* NEW 배지 */}
+              <div style={{ flex: '1 1 0', display: 'flex', flexWrap: 'wrap', gap: isMobile ? 4 : 8, alignItems: 'center', minWidth: 0, overflow: 'visible' }}>
                 {claim.isNew && (
                   <span style={{
                     height: 30, paddingInline: 8, paddingBlock: 4,
@@ -273,12 +305,9 @@ export function ClaimCard({ claim, isMobile = false, onDismissNew, onStatusChang
                     NEW
                   </span>
                 )}
-
-                {/* 상태 배지 */}
                 <StatusBadge badge={statusBadge} fontSize={fs.badge} isMobile={isMobile} />
               </div>
 
-              {/* 우측: 시간 + 구분선 + > 버튼 */}
               <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 4 : 8, flexShrink: 0 }}>
                 {!isMobile && (
                   <>
@@ -291,7 +320,6 @@ export function ClaimCard({ claim, isMobile = false, onDismissNew, onStatusChang
                     <div style={{ height: 12, width: 0, borderLeft: '1px solid rgba(0,0,0,0.12)' }} />
                   </>
                 )}
-
                 <button type="button"
                   onClick={e => { e.stopPropagation(); handleDismissNew(); }}
                   style={{
@@ -339,7 +367,7 @@ export function ClaimCard({ claim, isMobile = false, onDismissNew, onStatusChang
             </div>
           </div>
 
-          {/* ── 설명 알림박스 — 투숙객 클레임 내용 ── */}
+          {/* ── 설명 알림박스 ── */}
           <div style={{
             padding: alertPadding,
             background: '#FEEBEE', borderRadius: 8,
@@ -367,7 +395,7 @@ export function ClaimCard({ claim, isMobile = false, onDismissNew, onStatusChang
             </div>
           )}
 
-          {/* ── 처리 코멘트 (null이면 미노출) ── */}
+          {/* ── 처리 코멘트 ── */}
           {claim.comment && (
             <div style={{
               padding: '12px 16px', background: '#F5F5F5', borderRadius: 8,
@@ -386,16 +414,25 @@ export function ClaimCard({ claim, isMobile = false, onDismissNew, onStatusChang
             </div>
           )}
 
-          {/* ── 액션 버튼 (PENDING만 — COMPLETED는 읽기 전용) ── */}
-          {!isCompleted && (
-            <div style={{
-              display: 'flex', justifyContent: 'flex-end', gap: 8,
-              paddingTop: 4,
-            }}>
+          {/* ── 액션 버튼 ──
+               PENDING           → 이의제기(outlined) + 인정(contained)
+               DISPUTED          → 버튼 없음 (이의제기 진행중)
+               ACCEPTED          → 버튼 없음 (인정완료, 읽기전용)
+               DISPUTE_COMPLETED → 버튼 없음 (읽기전용)
+               ⚠️ ACCEPTED·DISPUTED는 mock 임시 키 — BE 확인 후 교체 */}
+          {claim.claimStatus === 'PENDING' && (
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, paddingTop: 4 }}>
               <ClaimActionButton
-                label="완료 처리"
+                label="이의제기"
                 isMobile={isMobile}
-                onClick={() => setShowConfirm(true)}
+                variant="outlined"
+                onClick={() => { setConfirmAction('dispute'); setShowConfirm(true); }}
+              />
+              <ClaimActionButton
+                label="인정"
+                isMobile={isMobile}
+                variant="contained"
+                onClick={() => { setConfirmAction('accept'); setShowConfirm(true); }}
               />
             </div>
           )}

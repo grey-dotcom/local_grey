@@ -12,6 +12,10 @@
  *   Report           lib/reports/models/report.dart
  *   Photo            lib/photo/models/photo.dart
  *   ImageSource      lib/photo/models/image_source.dart
+ *
+ * ─ 상태값 정책 ───────────────────────────────────────────────────────────
+ *   67차 세션에서 BE 개발서버 실측 기반으로 전면 재정의.
+ *   상세: docs/STATUS_POLICY.md
  */
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -31,32 +35,60 @@ export interface PhotoSource {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// 일감(Ticket) 상태
+// 일감(Ticket) 상태 — TicketStatus
 //
-// BE 원본 (lib/tickets/utils/enums.dart TicketStatus):
-//   PENDING    → 대기 (배정 전)
-//   ASSIGNED   → 배정됨
-//   RESERVED   → 예약됨 (수행전)
-//   STARTED    → 수행중
-//   RESOLVED   → 완료
-//   CANCELED   → 취소
+// BE 원본 (GET /shared/v1/ticket-statuses — 67차 실측 확인):
+//   REPORTED  → 보고됨  (이슈 접수 상태)
+//   PENDING   → 미배정  (배정 전)
+//   ASSIGNED  → 배정됨
+//   RESERVED  → 수행전
+//   STARTED   → 수행중
+//   RESOLVED  → 완료   (업무·이슈 완료 상태)
+//   HOLD      → 보류
+//   CANCELED  → 취소   (BE 원본 철자: D 1개)
 //
-// 프로토타입 확장 (BE와 협의 중인 8단계):
-//   REPORTED   — 보고됨 (접수 단계, BE PENDING 이전)
-//   UNASSIGNED — 미배정 (BE PENDING과 유사)
-//   ON_HOLD    — 보류 (BE 미존재, 프로토타입 확장)
-//
-// [BE 연동 시]: BE 응답값 → 프로토타입 매핑 테이블 확인 필요
+// ⚠️ 67차 키 교체 이력:
+//   UNASSIGNED  → PENDING   (BE 원본 키로 통일)
+//   BEFORE_START → RESERVED
+//   IN_PROGRESS  → STARTED
+//   COMPLETED    → RESOLVED
+//   CANCELLED    → CANCELED  (철자 주의: ED → D)
+//   ON_HOLD      → HOLD
 // ─────────────────────────────────────────────────────────────────────────
 export type TicketStatus =
-  | 'REPORTED'     // 보고됨     (프로토타입 확장 — BE: PENDING 이전 단계)
-  | 'UNASSIGNED'   // 미배정     (프로토타입 확장 — BE: PENDING 유사)
-  | 'ASSIGNED'     // 배정됨     (BE: ASSIGNED)
-  | 'BEFORE_START' // 수행전     (프로토타입 확장 — BE: RESERVED)
-  | 'IN_PROGRESS'  // 수행중     (프로토타입 확장 — BE: STARTED)
-  | 'COMPLETED'    // 완료       (프로토타입 확장 — BE: RESOLVED)
-  | 'ON_HOLD'      // 보류       (프로토타입 확장 — BE 미존재)
-  | 'CANCELLED';   // 취소       (프로토타입 확장 — BE: CANCELED)
+  | 'REPORTED'   // 보고됨 (이슈 접수 상태 — BE: REPORTED)
+  | 'PENDING'    // 미배정 (배정 전 — BE: PENDING)
+  | 'ASSIGNED'   // 배정됨 (BE: ASSIGNED)
+  | 'RESERVED'   // 수행전 (BE: RESERVED)
+  | 'STARTED'    // 수행중 (BE: STARTED)
+  | 'RESOLVED'   // 완료   (BE: RESOLVED)
+  | 'HOLD'       // 보류   (BE: HOLD)
+  | 'CANCELED';  // 취소   (BE: CANCELED — 철자 D 1개)
+
+// ─────────────────────────────────────────────────────────────────────────
+// 이슈 상태 — IssueStatus (TicketReportStatus 기준)
+//
+// BE 원본 (GET /shared/v1/ticket-report-statuses — 67차 실측 확인):
+//   REPORTED     → 접수됨  (보고된 이슈, 처리 이전 상태)
+//   HOLD         → 보류    (관제자가 검토 후 보류한 이슈)
+//   RESOLVED     → 완료    (관제자가 확인하여 완료 처리 — 운영자 "확인" 행위)
+//   CANCELED     → 취소    (관리자 또는 키퍼가 취소)
+//
+// ⚠️ 67차 키 교체 이력:
+//   RECEIVED  → REPORTED
+//   CONFIRMED → RESOLVED  (BE 미존재 — 운영자 확인 행위 = RESOLVED)
+//   PENDING   → 제거       (이슈 상태에 없음. 이슈→업무 전환 시 TicketStatus.PENDING으로 이동)
+//   ON_HOLD   → HOLD
+//   신규 추가: CANCELED
+//
+// ⚠️ IssueWidget은 이 enum을 기준으로 함 (FeedWidget의 TicketStatus와 별도)
+// DRAFT, AFTER_TICKET은 대시보드 표시 범위 외 — 미구현
+// ─────────────────────────────────────────────────────────────────────────
+export type IssueStatus =
+  | 'REPORTED'   // 접수됨 (BE: TicketReportStatus.REPORTED)
+  | 'HOLD'       // 보류   (BE: TicketReportStatus.HOLD)
+  | 'RESOLVED'   // 완료   (BE: TicketReportStatus.RESOLVED — 운영자 확인)
+  | 'CANCELED';  // 취소   (BE: TicketReportStatus.CANCELED)
 
 // ─────────────────────────────────────────────────────────────────────────
 // 이슈 타입
@@ -72,10 +104,36 @@ export type IssueType =
 
 // ─────────────────────────────────────────────────────────────────────────
 // 클레임 상태
+//
+// ⚠️ ClaimStatus.PENDING은 TicketStatus.PENDING(미배정)·IssueStatus와 전혀 다른 개념.
+//    ClaimStatus 전용 enum으로 타입 시스템에서 분리됨.
+//
+// 클레임은 완료된 일감(Ticket)에서만 생성 가능한 정산금액 확정 절차.
+// 전환 흐름: 처리대기(PENDING) → 인정완료(ACCEPTED) 또는 이의제기(DISPUTED) → 이의제기완료(DISPUTE_COMPLETED)
+//
+// ─ BE 연동 시 주의사항 ──────────────────────────────────────────────────
+// 아래 키는 프로토타입 mock 전용 임시 키입니다.
+// BE 실측 후 정확한 enum 키로 교체 필요:
+//
+//   ACCEPTED          → BE 키 미확정
+//                        근거: Exception.body.KEEPER_ADMIN_CANNOT_ACCEPT_TICKET_CLAIM (11c-server-ko.csv)
+//                        → 실 서비스 화면 표시: "인정 완료"
+//
+//   DISPUTED          → BE 키 미확정
+//                        근거: Exception.body.KEEPER_ADMIN_CANNOT_DISPUTE_TICKET_CLAIM (11c-server-ko.csv)
+//                        → 실 서비스 화면 표시: "이의 제기"
+//
+//   DISPUTE_COMPLETED → BE 키 미확정
+//                        근거: 실 서비스 화면 표시 "이의 제기 완료" 직접 확인
+//                        → BE /shared/v1/ticket-claim-statuses API 실측 필요
+//
+// [BE 개발자] 위 3개 키를 실 서비스 enum 값으로 교체 후 이 주석 삭제
 // ─────────────────────────────────────────────────────────────────────────
 export type ClaimStatus =
-  | 'PENDING'    // 처리 대기
-  | 'COMPLETED'; // 완료
+  | 'PENDING'           // 처리대기 — ClaimStatus 전용
+  | 'ACCEPTED'          // 인정완료 — ⚠️ mock 임시 키, BE 확인 후 교체 필요
+  | 'DISPUTED'          // 이의제기 — ⚠️ mock 임시 키, BE 확인 후 교체 필요
+  | 'DISPUTE_COMPLETED'; // 이의제기완료 — ⚠️ mock 임시 키, BE 확인 후 교체 필요
 
 // ─────────────────────────────────────────────────────────────────────────
 // GET /page-dashboard/v1/ticket-stats 응답
@@ -118,15 +176,14 @@ export interface TicketStats {
  * 모바일과 웹 탭 순서 동일 적용
  *
  * TASK(업무관리):
- *   - 지연/임박 아닌 진행 중 상태 (REPORTED|UNASSIGNED|ASSIGNED|BEFORE_START|IN_PROGRESS)
- *   - 지연/임박 카드도 업무관리 탭에 포함 여부 → PM 확인 필요
+ *   - 지연/임박 아닌 진행 중 상태 (REPORTED|PENDING|ASSIGNED|RESERVED|STARTED)
  *   [BE 연동 시] filter=TASK 또는 별도 API 파라미터 협의 필요
  */
 export type FeedFilter =
   | 'ALL'
   | 'DELAY'
   | 'TASK'       // 업무관리 — 모바일과 동일 탭 순서
-  | 'CANCELLED'
+  | 'CANCELED'   // ⚠️ 67차: CANCELLED → CANCELED (BE 원본 철자)
   | 'STARTED'
   | 'COMPLETED';
 
@@ -200,12 +257,13 @@ export interface TicketReportsResponse {
 // ─────────────────────────────────────────────────────────────────────────
 // 이슈 카드 (처리 필요 위젯)
 //
-// BE 대응 모델: Report (lib/reports/models/report.dart)
+// BE 대응 모델: TicketReport (lib/reports/models/report.dart)
+// issueStatus는 TicketReportStatus 기준 (67차 실측 확정)
 //
 // 필드 매핑:
 //   issueId         ← id
 //   issueType       ← type (BE: TicketReportType)
-//   issueStatus     ← (BE Report에 status 없음 — 대시보드 전용 확장 필드)
+//   issueStatus     ← status (BE: TicketReportStatus)
 //   description     ← description     ✅ 동일
 //   photoUrls       ← photos[].thumbnailUrl
 //                     [BE 연동 시] photoSources: PhotoSource[] 로 교체
@@ -214,23 +272,17 @@ export interface TicketReportsResponse {
 //   roomName        ← (동일)
 //   reporterName    ← (BE: keeper 정보에서 조인 필요)
 //   reportedAt      ← (BE Report에 없음 — TicketThumbnail 시간 필드 활용)
-//
-// ⚠️ BE Report 모델은 특이사항(단건) 기준. 대시보드 이슈 목록 API는 별도 확인 필요.
 // ─────────────────────────────────────────────────────────────────────────
 export type IssueFilter =
   | 'ALL'
-  | 'ISSUE'
-  | 'ON_HOLD'
-  | 'COMPLETED';
+  | 'ISSUE'      // 접수됨(REPORTED) 상태
+  | 'HOLD'       // 보류(HOLD) 상태 ⚠️ 67차: ON_HOLD → HOLD
+  | 'COMPLETED'; // 완료(RESOLVED) 상태
 
 export interface IssueReport {
   issueId: string;             // BE: id (Report.id)
   issueType: IssueType;        // BE: type (TicketReportType)
-  issueStatus:                 // 대시보드 전용 확장 — BE 연동 시 API 응답 확인 필요
-    | 'RECEIVED'   // 접수
-    | 'PENDING'    // 대기
-    | 'CONFIRMED'  // 확정
-    | 'COMPLETED'; // 완료
+  issueStatus: IssueStatus;    // BE: TicketReportStatus (67차 재정의 — docs/STATUS_POLICY.md §4)
   isNew: boolean;              // 미확인 여부 (프로토타입 확장)
   roomGroupId: string;         // 지점 ID (BE: TicketThumbnail 조인)
   roomGroupName: string;
@@ -257,8 +309,10 @@ export interface IssueReport {
 // ─────────────────────────────────────────────────────────────────────────
 export type ClaimFilter =
   | 'ALL'
-  | 'PENDING'
-  | 'COMPLETED';
+  | 'PENDING'           // 처리대기
+  | 'ACCEPTED'          // 인정완료 — ⚠️ mock 임시 키
+  | 'DISPUTED'          // 이의제기 — ⚠️ mock 임시 키
+  | 'DISPUTE_COMPLETED'; // 이의제기완료 — ⚠️ mock 임시 키
 
 export interface ClaimReport {
   claimId: string;

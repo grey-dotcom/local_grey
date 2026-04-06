@@ -62,6 +62,7 @@
  *   - opacity: 0.4 (정상 완료, 지연 없음)
  *   - inputbox: 미노출 (완료 상태 → 수정 불가)
  *   - 하단 버튼 우: `후속 일감 생성`(**error-contained** #D32F2F) — 58차 SVG 8 실측 확정
+ *   - mock 버그 B 수정 (66차): W1-TCKT-019 feedbackText null로 수정 → 케이스 G 정상 확인 가능
  *
  * [케이스 H] 업무관리 카드 — COMPLETED(완료) 메모 있음 (SVG 9 Type B)
  *   - 케이스 G와 동일, 추가로 읽기 전용 메모 박스 노출
@@ -126,6 +127,11 @@
  *   팝업 스펙: docs/POLICY.md § 12-1, 12-2 참고
  *   BE API: 프로토타입에서는 mock(console.log), 실연동 시 엔드포인트 교체
  *
+ * ─ opacity 정책 (66차 버그 C 수정) ──────────────────────────────────────
+ *   완료+지연 케이스(wasDelayedBeforeComplete=true): 헤더·키퍼명+위치 행 모두 opacity 1
+ *   일반 완료(wasDelayedBeforeComplete=false): 헤더·키퍼명+위치 행 모두 opacity 0.4
+ *   수정 전 버그: 키퍼명+위치 행에 wasDelayedBeforeComplete 조건 누락으로 opacity 불일치
+ *
  * ─ 24차 정책 미확정 항목 (디자이너/기획 확인 필요) ──────────────────────
  *   [P1] urgentCancel 버튼 스타일: SVG 1=outlined / SVG 2=contained / 둘 다 아님(사용자 확인)
  *        → 현행: outlined 임시 유지, 디자이너 스펙 재확인 필요
@@ -185,25 +191,20 @@ function getRemainingInfo(dueAt: string): { isOver: boolean; minutes: number; du
 }
 
 // ── 로케일 기준 현재 시각 (ms) ──────────────────────────────────────────────
-// 지연/임박 판정·배지 조건 모두 이 함수를 통해 현재 시각을 얻는다.
-// Date.now()는 UTC 기준이지만 new Date()도 동일한 epoch ms를 반환하므로
-// 로케일 표현(표시용)과 판정(ms 비교)을 분리하여 사용한다.
-// → 판정: localeNowMs() vs new Date(isoString).getTime() — 둘 다 UTC epoch ms 비교
-// → 표시: toLocaleString() 등 별도 처리
 function localeNowMs(): number {
-  return new Date().getTime(); // 항상 로컬 시스템 시각 기준 epoch ms
+  return new Date().getTime();
 }
 
 // ── 지연/임박 판정 ────────────────────────────────────────────────────────────
 export function isDelayOrUrgent(ticket: TicketReport): boolean {
-  const targets: TicketStatus[] = ['REPORTED', 'UNASSIGNED', 'ASSIGNED', 'BEFORE_START', 'IN_PROGRESS'];
+  // ⚠️ 68차: UNASSIGNED→PENDING, BEFORE_START→RESERVED, IN_PROGRESS→STARTED
+  const targets: TicketStatus[] = ['REPORTED', 'PENDING', 'ASSIGNED', 'RESERVED', 'STARTED'];
   if (!targets.includes(ticket.ticketStatus)) return false;
   return new Date(ticket.dueAt).getTime() - localeNowMs() <= URGENT_THRESHOLD_MS;
 }
 
 // ── 완료 카드의 지연 여부 판정 (47차 확정) ───────────────────────────────────
 // COMPLETED 카드는 delayUrgent=false이므로 별도 판정 필요.
-// 판단 기준: dueAt < 로케일 기준 현재 시각 (로케일 반영 epoch ms 비교)
 // ⚠️ 임시: completedAt 필드 없어 현재 시각 기준 판단 — B16 해결 시 completedAt > dueAt 으로 교체
 export function wasDelayedBeforeComplete(dueAt: string): boolean {
   return new Date(dueAt).getTime() < localeNowMs();
@@ -226,10 +227,9 @@ export function getTimeLabel(ticket: TicketReport): { text: string; isRed: boole
 }
 
 // ── 알림박스 텍스트 ───────────────────────────────────────────────────────────
-// 노출 우선순위 (45차 확정 — SVG 1~4 전체 적용):
+// 노출 우선순위 (45차 확정):
 //   1위: alertMessages 배열이 있고 비어있지 않으면 registeredAt 최신 1건 노출
 //   2위: alertMessages 없거나 빈 배열이면 dueAt 기반 마감시간 안내
-// mock: registeredAt 내림차순 [0]=최신 / 실서비스: BE가 정렬해서 내려주면 [0]만 사용
 function getAlertBoxContent(dueAt: string, alertMessages?: AlertMessage[]): string {
   if (alertMessages && alertMessages.length > 0) {
     const sorted = [...alertMessages].sort(
@@ -246,102 +246,83 @@ function getAlertBoxContent(dueAt: string, alertMessages?: AlertMessage[]): stri
 // ── 상태 배지 ─────────────────────────────────────────────────────────────────
 interface BadgeConfig { text: string; bg: string; color: string; icon?: 'check' | 'cancel' }
 
-// 배열 반환 (47차 변경: 완료+지연 중첩 배지 대응)
-// ─ 정책 (47차 확정) ────────────────────────────────────────────────────────
-// COMPLETED + dueAt < 현재 시각 → [완료 배지, 일감 마감 지연 배지] 동시 노출
-//   이유: 이미 지연된 업무가 완료된 경우 운영자가 지연 사실을 확인할 수 있어야 함
-//   배지 순서: 완료(주 상태) → 지연(부가 정보)
-// ⚠️ B16: completedAt 필드 확정 시 dueAt < 현재 시각 → completedAt > dueAt 으로 교체
+// 배열 반환 (47차: 완료+지연 중첩 배지 대응)
 function getStatusBadges(status: TicketStatus, delayUrgent: boolean, ticket: TicketReport): BadgeConfig[] {
-  if (status === 'COMPLETED') {
+  // ⚠️ 68차: COMPLETED→RESOLVED, CANCELLED→CANCELED, ON_HOLD→HOLD
+  //          UNASSIGNED→PENDING, BEFORE_START→RESERVED, IN_PROGRESS→STARTED
+  if (status === 'RESOLVED') {
     const badges: BadgeConfig[] = [{ text: '완료', bg: '#E8F5E9', color: '#1B5E20', icon: 'check' }];
-    // 완료 전 지연이었던 경우 지연 배지 추가 (B16 임시: dueAt < 현재 시각 판단)
     if (wasDelayedBeforeComplete(ticket.dueAt)) {
       badges.push({ text: '일감 마감 지연', bg: '#FEEBEE', color: '#FF1744' });
     }
     return badges;
   }
-  if (status === 'CANCELLED') return [{ text: '취소', bg: '#FEEBEE', color: '#FF1744', icon: 'cancel' }];
-  if (status === 'ON_HOLD')   return [{ text: '보류', bg: '#FEEBEE', color: '#FF1744' }];
+  if (status === 'CANCELED') return [{ text: '취소', bg: '#FEEBEE', color: '#FF1744', icon: 'cancel' }];
+  if (status === 'HOLD')     return [{ text: '보류', bg: '#FEEBEE', color: '#FF1744' }];
   if (delayUrgent) {
     const { isOver } = getRemainingInfo(ticket.dueAt);
     return isOver
       ? [{ text: '일감 마감 지연', bg: '#FEEBEE', color: '#FF1744' }]
       : [{ text: '마감 시간 임박', bg: '#FEEBEE', color: '#FF1744' }];
   }
-  // ─ 상태 배지 텍스트는 실서비스 상태값 그대로 표시 (27차 확정) ──────────
-  // BE에서 내려오는 8가지 ticketStatus 값을 FE가 임의로 변경하지 않음
-  // 단, 지연/임박 배지(`일감 마감 지연` / `마감 시간 임박`)는 FE가 dueAt 기준 판단
   switch (status) {
-    case 'REPORTED':     return [{ text: '보고됨',  bg: '#E3F2FD', color: '#0D47A1' }];
-    case 'UNASSIGNED':   return [{ text: '미배정',  bg: '#FFF3E0', color: '#E65100' }];
-    case 'ASSIGNED':     return [{ text: '배정됨',  bg: '#E8F5E9', color: '#1B5E20' }];
-    case 'BEFORE_START': return [{ text: '수행전',  bg: '#E8F5E9', color: '#1B5E20' }];
-    case 'IN_PROGRESS':  return [{ text: '수행중',  bg: '#E0F7FA', color: '#006064' }];
-    default:             return [{ text: status,    bg: '#EEEEEE', color: '#212121' }];
+    case 'REPORTED':  return [{ text: '보고됨',  bg: '#E3F2FD', color: '#0D47A1' }];
+    case 'PENDING':   return [{ text: '미배정',  bg: '#FFF3E0', color: '#E65100' }]; // ⚠️ 68차: UNASSIGNED→PENDING
+    case 'ASSIGNED':  return [{ text: '배정됨',  bg: '#E8F5E9', color: '#1B5E20' }];
+    case 'RESERVED':  return [{ text: '수행전',  bg: '#E8F5E9', color: '#1B5E20' }]; // ⚠️ 68차: BEFORE_START→RESERVED
+    case 'STARTED':   return [{ text: '수행중',  bg: '#E0F7FA', color: '#006064' }]; // ⚠️ 68차: IN_PROGRESS→STARTED
+    default:          return [{ text: status,    bg: '#EEEEEE', color: '#212121' }];
   }
 }
 
 // ── 좌측 색상바 ───────────────────────────────────────────────────────────────
-// 47차 수정: COMPLETED + 지연이었던 케이스 → 빨간 유지 (dueAt 기준, 루프 결과)
-// 이유: 완료 카드에서도 지연 정보를 시각적으로 표현해야 운영자가 서비스 지연 현황을 파악 가능
 function getLeftBarColor(status: TicketStatus, delayUrgent: boolean, dueAt?: string): string {
   if (delayUrgent) return '#FF1744';
-  if (status === 'CANCELLED' || status === 'ON_HOLD') return '#FF1744';
-  if (status === 'COMPLETED' && dueAt && wasDelayedBeforeComplete(dueAt)) return '#FF1744';
+  if (status === 'CANCELED' || status === 'HOLD') return '#FF1744'; // ⚠️ 68차: CANCELLED→CANCELED, ON_HOLD→HOLD
+  if (status === 'RESOLVED' && dueAt && wasDelayedBeforeComplete(dueAt)) return '#FF1744'; // ⚠️ 68차: COMPLETED→RESOLVED
   return '#9E9E9E';
 }
 
 // ── 액션 버튼 정의 ────────────────────────────────────────────────────────────
 // ⚠️ revert(되돌리기)는 서비스 정책상 존재하지 않습니다. 추가하지 말 것.
 type CardAction =
-  | 'urgentChange'    // 긴급 변경
-  | 'urgentCancel'    // 긴급 취소
-  | 'unassign'        // 배정 해제
-  | 'start'           // 시작하기
-  | 'cancelStart'     // 시작 취소
-  | 'forceComplete'   // 완료하기 (강제완료)
-  | 'createFollowUp'  // 후속 일감 생성 (링크)
-  | 'assign'          // 배정 하기
-  | 'cancelTicket';   // 일감 취소
+  | 'urgentChange'
+  | 'urgentCancel'
+  | 'unassign'
+  | 'start'
+  | 'cancelStart'
+  | 'forceComplete'
+  | 'createFollowUp'
+  | 'assign'
+  | 'cancelTicket';
 
-// activeFilter: 탭별 버튼 분기 필요 (SVG 7 확정 — 업무관리 탭 IN_PROGRESS urgentChange 노출)
 function getCardActions(
   status: TicketStatus,
   delayUrgent: boolean,
   localIsUrgent: boolean,
   activeFilter: import('@/types/dashboard').FeedFilter = 'ALL',
 ): CardAction[] {
-  // ── 완료/취소/보류 ─────────────────────────────────────────────────────────
-  if (status === 'COMPLETED') return ['createFollowUp']; // 후속 일감 생성만 노출
-  if (status === 'CANCELLED' || status === 'ON_HOLD') return [];
+  // ⚠️ 68차: COMPLETED→RESOLVED, CANCELLED→CANCELED, ON_HOLD→HOLD
+  //          UNASSIGNED→PENDING, BEFORE_START→RESERVED, IN_PROGRESS→STARTED
+  if (status === 'RESOLVED') return ['createFollowUp'];
+  if (status === 'CANCELED' || status === 'HOLD') return [];
 
   if (delayUrgent) {
-    // 지연/임박 탭: IN_PROGRESS → urgentChange 불가 (26차 확정, 유지)
-    //   지연/임박 탭 맥락에서 이미 수행중인 긴급 변경은 의미 없음
-    if (status === 'IN_PROGRESS') return ['forceComplete'];
+    if (status === 'STARTED') return ['forceComplete']; // ⚠️ 68차: IN_PROGRESS→STARTED
     return [localIsUrgent ? 'urgentCancel' : 'urgentChange', 'forceComplete'];
   }
 
-  // ── 업무관리 탭 (지연/임박 아닌 경우) ─────────────────────────────────────
   switch (status) {
     case 'REPORTED':
-    case 'UNASSIGNED':
-      // 🔴 27차 확정: 취소+배정. urgentChange는 배정하기와 연동, 별도 미노출
+    case 'PENDING':   // ⚠️ 68차: UNASSIGNED→PENDING
       return ['cancelTicket', 'assign'];
     case 'ASSIGNED':
-    case 'BEFORE_START':
-      // 🔴 55차 버그 수정: 업무관리 탭 ASSIGNED/BEFORE_START에서 긴급 변경 버튼 누락
-      //   지연/임박 탭: urgentChange 없음 (delayUrgent 분기에서 이미 처리됨)
-      //   업무관리 탭: urgentChange(or urgentCancel) 좌측에 추가
+    case 'RESERVED':  // ⚠️ 68차: BEFORE_START→RESERVED
       if (activeFilter === 'TASK') {
         return [localIsUrgent ? 'urgentCancel' : 'urgentChange', 'unassign', 'start'];
       }
       return ['unassign', 'start'];
-    case 'IN_PROGRESS':
-      // 🔴 SVG 7 확정 (51차): 업무관리 탭 한정 urgentChange 노출
-      //   지연/임박 탭 IN_PROGRESS에서는 기존대로 미노출
-      //   업무관리 탭 맥락: 수행 중인 키퍼에게 뒤늦게 긴급 여부 전달 가능
+    case 'STARTED':   // ⚠️ 68차: IN_PROGRESS→STARTED
       if (activeFilter === 'TASK') {
         return [localIsUrgent ? 'urgentCancel' : 'urgentChange', 'cancelStart', 'forceComplete'];
       }
@@ -351,14 +332,11 @@ function getCardActions(
   }
 }
 
-// 탭별 레이블 분기 (SVG 7 확정 — 업무관리 탭 `완료 하기` vs 지연/임박 탭 `완료`)
 function getActionLabel(
   action: CardAction,
   activeFilter: import('@/types/dashboard').FeedFilter = 'ALL',
 ): string {
   if (action === 'forceComplete') {
-    // 업무관리 탭: `완료 하기` — 운영자가 수행 흐름을 따라 정상 종료하는 느난
-    // 지연/임박 탭: `완료` — 긴급 상황에서 빠르게 누르는 강제완료 느난
     return activeFilter === 'TASK' ? '완료 하기' : '완료';
   }
   const LABELS: Record<CardAction, string> = {
@@ -379,14 +357,13 @@ type BtnVariant = 'error-outlined' | 'error-contained' | 'primary-contained' | '
 
 function getActionVariant(action: CardAction): BtnVariant {
   switch (action) {
-    case 'urgentChange':  // outlined — 긴급 변경 전 상태 (SVG 1 기준)
-    case 'unassign':      // outlined — 배정 해제
-    case 'cancelStart':   // outlined — 시작 취소
-    case 'cancelTicket':  // outlined — 일감 취소
+    case 'urgentChange':
+    case 'unassign':
+    case 'cancelStart':
+    case 'cancelTicket':
       return 'error-outlined';
-    case 'urgentCancel':  // contained — 긴급 변경 후 결과 상태 (SVG 2 기준)
-      return 'error-contained';
-    case 'createFollowUp': // error-contained — SVG 8·9 실측 #D32F2F (58차: SVG 기준 정본, POLICY neutral-outlined는 SVG 없이 임시 결정한 값이었음)
+    case 'urgentCancel':
+    case 'createFollowUp': // SVG 8·9 실측 #D32F2F contained (58차 확정)
       return 'error-contained';
     default:
       return 'primary-contained';
@@ -394,9 +371,6 @@ function getActionVariant(action: CardAction): BtnVariant {
 }
 
 // ── 확인 팝업 (25차 신규) ─────────────────────────────────────────────────────
-// POLICY.md § 12-1, 12-2 기준
-// urgentChange: title만, contents 없음
-// complete:     title + contents(복구 불가 경고)
 interface ConfirmModalProps {
   title: string;
   contents?: string;
@@ -439,32 +413,18 @@ function ConfirmModal({ title, contents, onConfirm, onCancel }: ConfirmModalProp
           </p>
         )}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
-          <button
-            type="button"
-            onClick={onCancel}
-            style={{
-              height: 36, paddingInline: 16,
-              background: 'none', border: '1px solid rgba(0,0,0,0.23)',
-              borderRadius: 4, cursor: 'pointer',
-              fontSize: 14, fontWeight: 500, fontFamily: 'inherit',
-              color: 'rgba(0,0,0,0.87)',
-            }}
-          >
-            취소
-          </button>
-          <button
-            type="button"
-            onClick={onConfirm}
-            style={{
-              height: 36, paddingInline: 16,
-              background: '#1976D2', border: 'none',
-              borderRadius: 4, cursor: 'pointer',
-              fontSize: 14, fontWeight: 500, fontFamily: 'inherit',
-              color: 'white',
-            }}
-          >
-            확인
-          </button>
+          <button type="button" onClick={onCancel} style={{
+            height: 36, paddingInline: 16,
+            background: 'none', border: '1px solid rgba(0,0,0,0.23)',
+            borderRadius: 4, cursor: 'pointer',
+            fontSize: 14, fontWeight: 500, fontFamily: 'inherit', color: 'rgba(0,0,0,0.87)',
+          }}>취소</button>
+          <button type="button" onClick={onConfirm} style={{
+            height: 36, paddingInline: 16,
+            background: '#1976D2', border: 'none',
+            borderRadius: 4, cursor: 'pointer',
+            fontSize: 14, fontWeight: 500, fontFamily: 'inherit', color: 'white',
+          }}>확인</button>
         </div>
       </div>
     </div>
@@ -515,7 +475,6 @@ function ActionButton({ action, isMobile, flex = false, activeFilter = 'ALL', on
     'error-contained':   { ...base, border: 'none', background: hovered ? '#B71C1C' : '#D32F2F', color: 'white', boxShadow: hovered ? '0 2px 4px rgba(0,0,0,0.2)' : 'none' },
     'primary-contained': { ...base, border: 'none', background: hovered ? '#1565C0' : '#1976D2', color: 'white', boxShadow: hovered ? '0 2px 4px rgba(0,0,0,0.2)' : 'none' },
     'neutral-outlined':  { ...base, border: '1px solid rgba(0,0,0,0.23)', background: hovered ? 'rgba(0,0,0,0.04)' : 'transparent', color: 'rgba(0,0,0,0.87)' },
-    // ⚠️ error-contained는 urgentCancel과 동일 스타일 — createFollowUp도 SVG 8·9 기준 #D32F2F contained (58차 수정)
   };
   return (
     <button type="button" onClick={onClick}
@@ -570,12 +529,13 @@ function PhoneTooltip({
 }
 
 // ── 업무 상세 모달 ────────────────────────────────────────────────────────────
+// ⚠️ 68차: UNASSIGNED→PENDING, BEFORE_START→RESERVED, IN_PROGRESS→STARTED
 const STATUS_STEPS: { key: TicketStatus; label: string }[] = [
-  { key: 'REPORTED',     label: '보고됨' },
-  { key: 'UNASSIGNED',   label: '미배정' },
-  { key: 'ASSIGNED',     label: '배정됨' },
-  { key: 'BEFORE_START', label: '수행전' },
-  { key: 'IN_PROGRESS',  label: '수행중' },
+  { key: 'REPORTED',  label: '보고됨' },
+  { key: 'PENDING',   label: '미배정' },
+  { key: 'ASSIGNED',  label: '배정됨' },
+  { key: 'RESERVED',  label: '수행전' },
+  { key: 'STARTED',   label: '수행중' },
 ];
 
 function formatDateTime(iso: string): string {
@@ -691,10 +651,8 @@ interface FeedCardProps {
   isMobile?: boolean;
   isSingleColumn?: boolean;
   onDismissNew?: (ticketId: string) => void;
-  // 25차: FeedWidget에서 내려주는 override + 변경 콜백
   localOverride?: CardLocalState;
   onLocalStateChange?: (ticketId: string, next: CardLocalState) => void;
-  // 27차: 현재 활성 탭 — showMemo 등 탭별 UI 분기에 사용
   activeFilter?: import('@/types/dashboard').FeedFilter;
 }
 
@@ -702,38 +660,34 @@ export function FeedCard({ ticket, isMobile = false, isSingleColumn = false, onD
   const [cardHovered,   setCardHovered]   = useState(false);
   const [showDetail,    setShowDetail]    = useState(false);
   const [showPhoneTip,  setShowPhoneTip]  = useState(false);
-  // ── 25차: 확인 팝업 상태 ──────────────────────────────────────────────────
   const [confirmType,   setConfirmType]   = useState<
     'urgentChange' | 'urgentCancel' | 'forceComplete' |
     'unassign' | 'start' | 'cancelStart' | 'cancelTicket' | null
   >(null);
-  // ── 25차: 로컬 상태 — localOverride(FeedWidget) 우선, 없으면 자체 state
   const [localStatus,   setLocalStatus]   = useState<TicketStatus>(ticket.ticketStatus);
   const [localIsUrgent, setLocalIsUrgent] = useState(false);
-  // ── 51차: 메모 inputbox 상태 (React 훅 규칙: 컴포넌트 상단에 선언) ────────
   const [memoText,      setMemoText]      = useState('');
 
-  // FeedWidget에서 override가 내려오면 동기화
   const effectiveStatus   = localOverride?.status   ?? localStatus;
   const effectiveIsUrgent = localOverride?.isUrgent ?? localIsUrgent;
 
   const phoneBtnRef = useRef<HTMLDivElement>(null);
 
+  // ⚠️ 68차: COMPLETED→RESOLVED, CANCELLED→CANCELED, ON_HOLD→HOLD
   const delayUrgent  =
-    !['COMPLETED', 'CANCELLED', 'ON_HOLD'].includes(effectiveStatus) &&
+    !['RESOLVED', 'CANCELED', 'HOLD'].includes(effectiveStatus) &&
     isDelayOrUrgent({ ...ticket, ticketStatus: effectiveStatus });
-  const statusBadges = getStatusBadges(effectiveStatus, delayUrgent, ticket); // 47차: 배열로 변경
-  const leftBarColor = getLeftBarColor(effectiveStatus, delayUrgent, ticket.dueAt); // 47차: dueAt 전달 — 완료+지연 색상바 적용
+  const statusBadges = getStatusBadges(effectiveStatus, delayUrgent, ticket);
+  const leftBarColor = getLeftBarColor(effectiveStatus, delayUrgent, ticket.dueAt);
   const timeLabel    = getTimeLabel({ ...ticket, ticketStatus: effectiveStatus });
   const actions      = getCardActions(effectiveStatus, delayUrgent, effectiveIsUrgent, activeFilter);
-  const isCompleted  = effectiveStatus === 'COMPLETED';
-  const isCancelled  = effectiveStatus === 'CANCELLED' || effectiveStatus === 'ON_HOLD';
+  const isCompleted  = effectiveStatus === 'RESOLVED';  // ⚠️ 68차: COMPLETED→RESOLVED
+  const isCancelled  = effectiveStatus === 'CANCELED' || effectiveStatus === 'HOLD'; // ⚠️ 68차: CANCELLED→CANCELED, ON_HOLD→HOLD
 
   const dismissNew = useCallback(() => {
     if (ticket.isNew) onDismissNew?.(ticket.ticketId);
   }, [ticket.isNew, ticket.ticketId, onDismissNew]);
 
-  // ── 확인 팝업 핸들러 ─────────────────────────────────────────────────────
   function handleActionClick(action: CardAction) {
     dismissNew();
     if (action === 'urgentChange')   { setConfirmType('urgentChange');   return; }
@@ -744,11 +698,9 @@ export function FeedCard({ ticket, isMobile = false, isSingleColumn = false, onD
     if (action === 'cancelStart')    { setConfirmType('cancelStart');    return; }
     if (action === 'cancelTicket')   { setConfirmType('cancelTicket');   return; }
     if (action === 'createFollowUp') {
-      // 링크 방식으로 후속 일감 생성 — 정책 추후 확정 후 URL 연결
       console.log('[FeedCard] createFollowUp', ticket.ticketId);
       return;
     }
-    // 그 외 액션: 콘솔 출력 (프로토타입)
     console.log(`[FeedCard] ${action}`, ticket.ticketId);
   }
 
@@ -767,27 +719,32 @@ export function FeedCard({ ticket, isMobile = false, isSingleColumn = false, onD
     }
     if (confirmType === 'forceComplete') {
       console.log('[FeedCard] forceComplete API call', ticket.ticketId);
-      const next: CardLocalState = { status: 'COMPLETED', isUrgent: effectiveIsUrgent };
-      setLocalStatus('COMPLETED');
+      const next: CardLocalState = { status: 'RESOLVED', isUrgent: effectiveIsUrgent }; // ⚠️ 68차: COMPLETED→RESOLVED
+      setLocalStatus('RESOLVED');
       onLocalStateChange?.(ticket.ticketId, next);
     }
     if (confirmType === 'unassign') {
       console.log('[FeedCard] unassign API call', ticket.ticketId);
-      const next: CardLocalState = { status: 'UNASSIGNED', isUrgent: effectiveIsUrgent };
-      setLocalStatus('UNASSIGNED');
+      const next: CardLocalState = { status: 'PENDING', isUrgent: effectiveIsUrgent }; // ⚠️ 68차: UNASSIGNED→PENDING
+      setLocalStatus('PENDING');
       onLocalStateChange?.(ticket.ticketId, next);
     }
     if (confirmType === 'start') {
       console.log('[FeedCard] start API call', ticket.ticketId);
-      const next: CardLocalState = { status: 'IN_PROGRESS', isUrgent: effectiveIsUrgent };
-      setLocalStatus('IN_PROGRESS');
+      const next: CardLocalState = { status: 'STARTED', isUrgent: effectiveIsUrgent }; // ⚠️ 68차: IN_PROGRESS→STARTED
+      setLocalStatus('STARTED');
       onLocalStateChange?.(ticket.ticketId, next);
     }
     if (confirmType === 'cancelStart') {
       console.log('[FeedCard] cancelStart API call', ticket.ticketId);
-      // 🔴 시작 취소 → ASSIGNED 상태로 롤백 (27차 확정)
       const next: CardLocalState = { status: 'ASSIGNED', isUrgent: effectiveIsUrgent };
       setLocalStatus('ASSIGNED');
+      onLocalStateChange?.(ticket.ticketId, next);
+    }
+    if (confirmType === 'cancelTicket') {
+      console.log('[FeedCard] cancelTicket API call', ticket.ticketId);
+      const next: CardLocalState = { status: 'CANCELED', isUrgent: false }; // ⚠️ 68차: CANCELLED→CANCELED
+      setLocalStatus('CANCELED');
       onLocalStateChange?.(ticket.ticketId, next);
     }
     setConfirmType(null);
@@ -801,66 +758,52 @@ export function FeedCard({ ticket, isMobile = false, isSingleColumn = false, onD
   const cardPadding  = isMobile ? '12px' : '24px 24px 24px 16px';
   const alertPadding = isMobile ? '8px 12px' : '16px 20px';
 
-  // ── 알림박스 텍스트 (47차 수정) ─────────────────────────────────────────
-  // 우선순위:
-  //   1. 지연/임박 카드: alertMessages 있으면 최신 1건, 없으면 마감시간 안내
-  //   2. 완료 카드: alertMessages 있으면 최신 1건 표시 (마감시간 안내는 미노출)
-  //      이유: 이미 완료된 건에서 마감 안내는 의미 없음, 운영자 알럿은 유지 필요
-  //   3. 취소/보류 카드: feedbackText (취소 사유)
-  // alertText: 빨간 #FEEBEE 알림박스 — 지연/임박 및 운영자 알럿 전용
-  // 취소/보류 feedbackText는 하단 회색 박스(별도 렌더링)로만 표시 — 55차 중복 제거
+  // 알림박스 텍스트 (47차 수정)
+  // RESOLVED(완료) 카드에 alertMessages 있으면 노출 (COMPLETED→RESOLVED 68차)
   const alertText: string | null = delayUrgent
     ? getAlertBoxContent(ticket.dueAt, ticket.alertMessages)
     : isCompleted && ticket.alertMessages && ticket.alertMessages.length > 0
-      ? getAlertBoxContent(ticket.dueAt, ticket.alertMessages) // dueAt은 무시, alertMessages 최신 1건만 반환
+      ? getAlertBoxContent(ticket.dueAt, ticket.alertMessages)
       : null;
 
-  // 메모 영역 노출 조건 (27차 확정 / 51차 수정)
-  // 업무관리 탭 + REPORTED~IN_PROGRESS + 미완료 상태일 때만 입력 가능 inputbox 노출
-  // COMPLETED 상태에서는 inputbox 미노출 (읽기 전용으로 별도 처리 — SVG 8·9)
+  // 메모 inputbox 노출 조건 (27차/51차)
+  // ⚠️ 68차: UNASSIGNED→PENDING, BEFORE_START→RESERVED, IN_PROGRESS→STARTED
   const showMemo =
     activeFilter === 'TASK' &&
     !isCompleted &&
     !isCancelled &&
     !delayUrgent &&
-    ['REPORTED', 'UNASSIGNED', 'ASSIGNED', 'BEFORE_START', 'IN_PROGRESS'].includes(effectiveStatus);
+    ['REPORTED', 'PENDING', 'ASSIGNED', 'RESERVED', 'STARTED'].includes(effectiveStatus);
 
-  // 메모 inputbox 저장 버튼 OR 조건 (50차 확정 §12-9)
-  //   memoText 또는 images 중 하나라도 있으면 active
-  const memoSaveActive = memoText.trim().length > 0; // 이미지는 추후 images.length > 0 OR 조건 추가
+  const memoSaveActive = memoText.trim().length > 0;
 
   const hasPhone = !!ticket.keeperPhone;
 
-  // > 버튼: 항상 회색 — SVG 1·2·3 전체 실측 확인 (58차 수정, 이전 delayUrgent 조건 제거)
   const detailBtnStyle: React.CSSProperties = {
     width: 30, height: 30, background: '#EEEEEE',
     borderRadius: isMobile ? 8 : 4, border: 'none', cursor: 'pointer',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
   };
-  const detailBtnIconColor = 'rgba(0,0,0,0.56)'; // 항상 회색 아이콘
+  const detailBtnIconColor = 'rgba(0,0,0,0.56)';
 
-  // ── 팝업 스펙 (POLICY.md § 12-1, 12-2, 27차 추가) ──────────────────────
   const confirmConfig: { title: string; contents?: string } | null = (() => {
     switch (confirmType) {
       case 'urgentChange':
-        // REPORTED/UNASSIGNED 특수 케이스: 배정 시 긴급 등록 안내
         if (effectiveStatus === 'REPORTED' || effectiveStatus === 'UNASSIGNED') {
-          return { title: '배정하면 긴급업무로 생성돼요', contents: undefined }; // ⚠️ P4: 디자인 확정 필요
+          return { title: '배정하면 긴급업무로 생성돼요' };
         }
-        return { title: '선택하신 일감을 긴급 처리 건으로 변경하시겠습니까?', contents: undefined };
+        return { title: '선택하신 일감을 긴급 처리 건으로 변경하시겠습니까?' };
       case 'urgentCancel':
-        return { title: '선택하신 일감의 긴급 처리를 취소하시겠습니까?', contents: undefined }; // ⚠️ Q3 임시
+        return { title: '선택하신 일감의 긴급 처리를 취소하시겠습니까?' }; // ⚠️ Q3 임시
       case 'forceComplete':
         return { title: '선택하신 일감을 완료 처리하시겠습니까?', contents: '완료 처리된 일감은 복구할 수 없습니다.' };
       case 'unassign':
-        // 키퍼 매칭을 해제하시겠습니까? (51차 확정 — 기존 임시 문구 교체)
-        return { title: '키퍼 매칭을 해제하시겠습니까?', contents: undefined };
+        return { title: '키퍼 매칭을 해제하시겠습니까?' };
       case 'start':
-        return { title: '선택하신 일감을 시작 처리하시겠습니까?', contents: undefined };
+        return { title: '선택하신 일감을 시작 처리하시겠습니까?' };
       case 'cancelStart':
         return { title: '선택하신 일감의 시작을 취소하시겠습니까?', contents: '취소 시 배정됨 상태로 되돌아갑니다.' };
       case 'cancelTicket':
-        // ⚠️ Q-C 임시 — PM 최종 확정 대기
         return { title: '일감을 취소하시겠습니까?', contents: '취소된 일감은 복구할 수 없으며 어드민에서 삭제됩니다.' };
       default:
         return null;
@@ -871,7 +814,6 @@ export function FeedCard({ ticket, isMobile = false, isSingleColumn = false, onD
     <>
       {showDetail && <TicketDetailModal ticket={ticket} onClose={() => setShowDetail(false)} />}
 
-      {/* 확인 팝업 (urgentChange / complete) */}
       {confirmType && confirmConfig && (
         <ConfirmModal
           title={confirmConfig.title}
@@ -900,9 +842,8 @@ export function FeedCard({ ticket, isMobile = false, isSingleColumn = false, onD
             : '0 1px 4px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.03)',
           transform: cardHovered ? 'translateY(-2px)' : 'none',
           cursor: 'default',
-          minWidth: 0,      // 30차 수정: 컬럼 가용 너비(263px) < minWidth(280px) overflow 해결
-          // maxWidth: 600 제거 (37차) — 1열 우측 122px 공백 해소
-          width: '100%',    // 컨테이너 너비에 맞춤
+          minWidth: 0,
+          width: '100%',
           boxSizing: 'border-box',
         }}
       >
@@ -914,19 +855,13 @@ export function FeedCard({ ticket, isMobile = false, isSingleColumn = false, onD
         <div style={{ flex: '1 1 0', display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }}>
 
           {/* 헤더 영역
-               opacity 정책 (47차 수정):
-               완료+지연 케이스(지연이었던 완료)는 지연 정보를 침실하지 않도록 opacity 1 유지
-               지연 없는 일반 완료이면만 opacity 0.4 적용 */}
+               opacity 정책 (47차/66차 버그C 수정):
+               완료+지연 케이스는 지연 정보 노출을 위해 opacity 1 유지
+               일반 완료(지연 없음)만 opacity 0.4 적용 */}
           <div style={{ opacity: isCompleted && !delayUrgent && !wasDelayedBeforeComplete(ticket.dueAt) ? 0.4 : 1 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-              {/* 상태배지 영역: wrap 허용 — 배지 초과 시 두 줄 처리 (62차 원정책 복원)
-                   61차 overflow:visible 수정 시 nowrap 유지로 우측 시간 영역 침범 버그 발생.
-                   근본 원인: nowrap+visible 조합 → 배지가 우측 flex 형제(시간/전화/버튼)를 밀어냄.
-                   수정: flexWrap:'wrap'으로 복원. 배지 개별 whiteSpace:nowrap + flexShrink:0 유지. */}
+              {/* 상태배지 영역: wrap 허용 — 62차 원정책 (nowrap+visible 조합 버그 → wrap 복원) */}
               <div style={{ flex: '1 1 0', display: 'flex', flexWrap: 'wrap', gap: isMobile ? 4 : 6, alignItems: 'center', minWidth: 0, overflow: 'visible' }}>
-                {/* NEW 배지: 사용자 미확인 일감 — BE isNew 필드 기준 (27차 확정)
-                    실서비스: 사용자 확인 시 BE에 확인 여부 전달 필요 (B12)
-                    프로토타입: localStorage 기반 랜덤 복구 (FeedWidget 처리) */}
                 {ticket.isNew && (
                   <span style={{
                     height: 30, paddingInline: 8, paddingBlock: 4,
@@ -937,10 +872,6 @@ export function FeedCard({ ticket, isMobile = false, isSingleColumn = false, onD
                     whiteSpace: 'nowrap', flexShrink: 0,
                   }}>NEW</span>
                 )}
-                {/* 신규 배지: 오늘 생성된 일감 — BE 별도 필드 필요 (B10)
-                    실서비스: isCreatedToday 또는 createdAt 날짜 비교로 판단
-                    현행: mock에 해당 필드 없어 미노출 상태 — BE 확정 후 연결 */}
-                {/* 상태 배지 (47차: 배열로 변경 — 완료+지연 중첩 배지 대응) */}
                 {statusBadges.map((badge, idx) => (
                   <span key={idx} style={{
                     height: 30, paddingInline: 8, paddingBlock: 4,
@@ -1035,7 +966,8 @@ export function FeedCard({ ticket, isMobile = false, isSingleColumn = false, onD
           </div>
 
           {/* 키퍼명 + 위치 정보 */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, opacity: isCompleted && !delayUrgent ? 0.4 : 1 }}>
+          {/* opacity 정책 (헤더와 동일 — 66차 버그C 수정): 완료+지연 케이스는 지연 정보 노출을 위해 opacity 1 유지 */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, opacity: isCompleted && !delayUrgent && !wasDelayedBeforeComplete(ticket.dueAt) ? 0.4 : 1 }}>
             <div style={{ display: 'flex', justifyContent: isMobile ? 'space-between' : 'flex-start', alignItems: 'center' }}>
               <span style={{ color: 'rgba(0,0,0,0.87)', fontSize: fs.name, fontWeight: 700, lineHeight: '28px', letterSpacing: '0.20px' }}>
                 {ticket.keeperName ?? '미배정'}
@@ -1071,14 +1003,12 @@ export function FeedCard({ ticket, isMobile = false, isSingleColumn = false, onD
           {/* 수행 사진 */}
           {ticket.photoUrls.length > 0 && <ImageGrid urls={ticket.photoUrls} />}
 
-          {/* 메모 영역 */}
-          {/* 입력 가능 inputbox (SVG 5·6·7 기준 — 업무관리 탭 + 미완료 상태) */}
+          {/* 메모 입력 inputbox (SVG 5·6·7 — 업무관리 탭 + 미완료 상태) */}
           {showMemo && (
             <div style={{
               padding: 12, background: '#F5F5F5', borderRadius: 8,
               display: 'flex', flexDirection: 'column', gap: 8,
             }}>
-              {/* textarea: MUI Outlined variant 스타일 — outline 테두리로 입력 가능함을 표현 */}
               <div style={{ background: 'white', borderRadius: 4 }}>
                 <textarea
                   value={memoText}
@@ -1095,22 +1025,19 @@ export function FeedCard({ ticket, isMobile = false, isSingleColumn = false, onD
                   }}
                 />
               </div>
-              {/* 이미지 영역 */}
               <div style={{ padding: 8, background: 'white', borderRadius: 4, display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  {/* 이미지 placeholder (40px 원형, #D9D9D9 배경) */}
                   <div style={{ width: 40, height: 40, background: '#D9D9D9', borderRadius: '50%', flexShrink: 0 }} />
                 </div>
                 <div style={{ height: 0, borderTop: '1px solid #EEEEEE' }} />
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  {/* 사진 추가 버튼 */}
                   <button type="button" style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, color: 'rgba(0,0,0,0.87)', fontSize: 14, fontWeight: 500, fontFamily: 'inherit', padding: '6px 8px' }}>
                     <svg width={16} height={16} viewBox="0 0 24 24" fill="none">
                       <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z" fill="rgba(0,0,0,0.87)" />
                     </svg>
                     사진 추가
                   </button>
-                  {/* 저장 버튼 — 취소 미노출 (50차 확정 §12-9), OR 조건: memoText || images */}
+                  {/* 저장 — 취소 미노출 (50차 §12-9), OR 조건: memoText || images */}
                   <button
                     type="button"
                     disabled={!memoSaveActive}
@@ -1132,18 +1059,15 @@ export function FeedCard({ ticket, isMobile = false, isSingleColumn = false, onD
             </div>
           )}
 
-          {/* 읽기 전용 메모 박스 (SVG 9 Type B — 업무관리 탭 + COMPLETED + 메모 있음)
-               - 테두리 없음: 입력 가능 textarea의 outline과 구분하여 "수정 불가" 시각적 표현
-               - padding 20px/16px: 읽기 편하게 넷넓하게 (SVG 9 실측)
-               - 자연 높이: 텍스트 양에 따라 박스 확장 */}
+          {/* 읽기 전용 메모 박스 (SVG 9 Type B — 업무관리 탭 + COMPLETED + feedbackText 있음)
+               테두리 없음: 입력 가능 textarea outline과 구분 → 수정 불가 시각화
+               padding 12px 균일: 58차 SVG 9 실측 (이전 paddingLeft:20/paddingTop:16은 임시값) */}
           {isCompleted && activeFilter === 'TASK' && ticket.feedbackText && (
             <div style={{ padding: 12, background: '#F5F5F5', borderRadius: 8 }}>
               <div style={{
-                // SVG 9 실측 (58차): 외부 컨테이너 padding 12px, 내부 흰 박스 padding 12px 균일
-                // 이전 코드 paddingLeft:20/paddingTop:16은 SVG 없이 POLICY에서 임시 결정한 값이었음
                 padding: 12,
                 background: 'white', borderRadius: 4,
-                // 테두리 없음 — SVG 9 키포인트: 수정 불가 상태 시각화
+                // 테두리 없음 — 수정 불가 상태 시각화
                 color: '#212121', fontSize: 14, fontWeight: 400,
                 lineHeight: '20.02px', letterSpacing: '0.20px',
                 wordBreak: 'break-word',
@@ -1153,7 +1077,7 @@ export function FeedCard({ ticket, isMobile = false, isSingleColumn = false, onD
             </div>
           )}
 
-          {/* 취소/보류 탭 feedbackText (취소 사유 표시 한정 — 완료 카드는 위의 SVG 9 락스로 별도 처리됨) */}
+          {/* 취소/보류 feedbackText — 취소 사유 표시 (CANCELLED·ON_HOLD 탭 전용) */}
           {isCancelled && ticket.feedbackText && (
             <div style={{
               padding: '16px 20px', background: '#F5F5F5', borderRadius: 8,
@@ -1165,14 +1089,10 @@ export function FeedCard({ ticket, isMobile = false, isSingleColumn = false, onD
             </div>
           )}
 
-          {/* 하단 액션 버튼 영역
-              - urgentChange / complete 클릭 시 ConfirmModal 호출 (25차 구현)
-              - COMPLETED: actions = [] → 미노출 */}
+          {/* 하단 액션 버튼 */}
           {actions.length > 0 && (
             <>
               <div style={{ height: 0, borderTop: '1px solid #EEEEEE' }} />
-              {/* 좌측: urgentChange/urgentCancel 단독 / 우측: 나머지
-                   urgentChange가 없으면 flex-end으로 우측 정렬 (createFollowUp 단독 케이스 등) */}
               <div style={{ display: 'flex', justifyContent: actions.some(a => a === 'urgentChange' || a === 'urgentCancel') ? 'space-between' : 'flex-end', alignItems: 'center' }}>
                 <div style={{ display: 'flex', gap: 8 }}>
                   {actions.filter(a => a === 'urgentChange' || a === 'urgentCancel').map((action) => (

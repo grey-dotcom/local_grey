@@ -1,0 +1,12 @@
+{
+  "name": "prompting-cli",
+  "version": "1.0.0",
+  "description": "",
+  "type": "module",
+  "main": "cli.js",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.78.0",
+    "dotenv": "^17.3.1",
+    "readline-sync": "^1.4.10"
+  }
+}
